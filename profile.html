@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Profile — Hidden Hydra</title>
+  <link rel="stylesheet" href="global.css">
+  <style>
+    body { overflow-y:auto; }
+    #loading { position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:9999; }
+    #pg { display:none; min-height:100dvh; position:relative; z-index:1; }
+    .bg-glow { position:fixed;top:-100px;left:-100px;width:450px;height:450px;border-radius:50%;background:radial-gradient(circle,rgba(201,168,76,.06) 0%,transparent 70%);pointer-events:none; }
+    nav { position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:14px 36px;background:rgba(5,5,10,.92);border-bottom:1px solid var(--border);backdrop-filter:blur(12px); }
+    .nlogo { font-family:'Cinzel',serif;font-size:14px;color:var(--gold);letter-spacing:3px;display:flex;align-items:center;gap:8px; }
+    .hero { display:flex;align-items:center;gap:36px;padding:52px 80px;border-bottom:1px solid var(--border);animation:fadeUp .6s ease; }
+    .av-wrap { display:flex;flex-direction:column;align-items:center;gap:10px; }
+    .av-big { width:110px;height:110px;border-radius:50%;border:2px solid var(--gold3);background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:56px;overflow:hidden;box-shadow:0 0 0 7px rgba(201,168,76,.07); }
+    .av-big img { width:100%;height:100%;object-fit:cover;border-radius:50%; }
+    .h-user { font-family:'Cinzel',serif;font-size:32px;color:var(--gold);letter-spacing:2px;margin-bottom:8px; }
+    .h-bio  { font-family:'Cormorant Garamond',serif;font-size:17px;font-style:italic;color:var(--dim);margin-bottom:6px; }
+    .h-meta { font-size:13px;color:var(--dim);margin-bottom:4px; }
+    .card { max-width:680px;margin:36px auto;background:var(--s2);border:1px solid var(--border);border-radius:var(--r2);padding:36px;position:relative;animation:fadeUp .6s ease .1s both; }
+    .card::before { content:'';position:absolute;top:0;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent); }
+    .card-title { font-family:'Cinzel',serif;font-size:10px;letter-spacing:4px;color:var(--gold3);margin-bottom:24px;text-transform:uppercase; }
+    .grid2 { display:grid;grid-template-columns:1fr 1fr;gap:0 22px; }
+    .eg-sm { display:flex;flex-wrap:wrap;gap:5px; }
+    .es { width:30px;height:30px;font-size:17px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;transition:all .15s;border:1px solid transparent; }
+    .es:hover { background:var(--s3); } .es.on { background:rgba(201,168,76,.14);border-color:var(--gold3); }
+    .pf-actions { display:flex;gap:10px;margin-top:24px;padding-top:22px;border-top:1px solid var(--border); }
+    .btn-out { padding:12px 18px;background:transparent;border:1px solid rgba(192,57,43,.3);border-radius:var(--r);color:rgba(192,57,43,.7);font-family:'Cinzel',serif;font-size:11px;letter-spacing:2px;cursor:pointer;transition:all .2s; }
+    .btn-out:hover { border-color:var(--danger);color:var(--danger); }
+    .stats { display:flex;justify-content:center;gap:40px;padding:36px 80px 72px;animation:fadeUp .6s ease .2s both; }
+    .sn { font-family:'Cinzel',serif;font-size:34px;font-weight:700;color:var(--gold);text-align:center; }
+    .sl { font-size:10px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;margin-top:4px;text-align:center; }
+    .spin-sm { width:14px;height:14px;border-radius:50%;border:2px solid rgba(0,0,0,.2);border-top-color:var(--bg);animation:spin .7s linear infinite; }
+    @media(max-width:700px) { .hero{flex-direction:column;text-align:center;padding:36px 20px} .card{margin:20px 14px;padding:24px 18px} .grid2{grid-template-columns:1fr} nav{padding:12px 18px} .stats{padding:32px 20px;gap:24px} .h-user{font-size:22px} }
+  </style>
+</head>
+<body>
+<div id="loading"><div style="font-size:48px;animation:pulse 2s infinite">🐉</div><div class="ring"></div></div>
+<div id="pg">
+  <div class="bg-glow"></div>
+  <nav>
+    <button class="btn-ghost" style="font-size:11px;padding:8px 16px" onclick="window.location.href='chat.html'">← Chat</button>
+    <div class="nlogo"><span>🐉</span>HIDDEN HYDRA</div>
+    <button class="btn-ghost" style="font-size:11px;padding:8px 16px;border-color:rgba(192,57,43,.3);color:rgba(192,57,43,.7)" onclick="doLogout()">Sign Out</button>
+  </nav>
+  <div class="hero">
+    <div class="av-wrap">
+      <div class="av-big" id="av-big"></div>
+      <button class="btn-ghost" style="font-size:11px;padding:7px 14px;white-space:nowrap" onclick="document.getElementById('ph-inp').click()">📸 Change Photo</button>
+      <input type="file" id="ph-inp" accept="image/*" style="display:none">
+    </div>
+    <div>
+      <div class="h-user" id="h-user">—</div>
+      <div class="h-bio"  id="h-bio">—</div>
+      <div class="h-meta" id="h-country">—</div>
+      <div class="h-meta" id="h-joined" style="font-size:11px;color:var(--faint);letter-spacing:2px;text-transform:uppercase">—</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">EDIT PROFILE</div>
+    <div class="grid2">
+      <div class="ig"><label>Username</label><input class="ii" id="e-user" maxlength="24" placeholder="Your name..."></div>
+      <div class="ig"><label>Bio</label><input class="ii" id="e-bio" maxlength="80" placeholder="Tell your story..."></div>
+      <div class="ig"><label>Country</label><select class="ii" id="e-country"></select></div>
+      <div class="ig"><label>Avatar</label><div class="eg-sm" id="eg-sm"></div></div>
+      <div class="ig" style="grid-column:1/-1"><label>Accent Color</label><div class="swatches" id="swatches"></div></div>
+    </div>
+    <div class="pf-actions">
+      <button class="btn-gold" style="flex:1;justify-content:center" id="save-btn" onclick="doSave()">
+        <span id="save-txt">SAVE CHANGES</span>
+        <div class="spin-sm" id="save-spin" style="display:none"></div>
+      </button>
+      <button class="btn-out" onclick="doLogout()">SIGN OUT</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div><div class="sn" id="st-dms">—</div><div class="sl">Conversations</div></div>
+    <div><div class="sn" id="st-grps">—</div><div class="sl">Groups</div></div>
+    <div><div class="sn">∞</div><div class="sl">Messages</div></div>
+  </div>
+</div>
+<div id="toasts"></div>
+
+<script type="module">
+import { auth, db, rtdb,
+         onAuthStateChanged, signOut,
+         doc, getDoc, updateDoc, collection, query, where, getDocs,
+         ref, set, rtTs } from './firebase-config.js';
+
+const AVICS=['🐉','🦊','🐺','🦁','🐯','🦋','🔥','⚡','🌙','💎','🌊','🦅','🐬','🦝','🎭','🌸','🐙','🦄','⭐','🗡️'];
+const COLORS=['#C9A84C','#C0392B','#8E44AD','#2980B9','#16A085','#D35400','#E91E63','#00BCD4'];
+const COUNTRIES=['🌍 Global','🇺🇸 USA','🇬🇧 UK','🇮🇳 India','🇵🇰 Pakistan','🇧🇩 Bangladesh','🇩🇪 Germany','🇫🇷 France','🇯🇵 Japan','🇨🇳 China','🇧🇷 Brazil','🇷🇺 Russia','🇰🇷 Korea','🇸🇦 Saudi Arabia','🇦🇪 UAE','🇨🇦 Canada','🇦🇺 Australia','🇲🇽 Mexico','🇹🇷 Turkey','🇮🇹 Italy','🇪🇸 Spain','🇵🇭 Philippines','🇵🇱 Poland','🇺🇦 Ukraine','🇸🇬 Singapore','🇳🇬 Nigeria'];
+
+let ME=null, MY=null, newPhoto=null, selAvatar=null, selColor=null;
+
+function toast(msg,type=''){const tc=document.getElementById('toasts');const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;tc.appendChild(t);setTimeout(()=>t.remove(),3200);}
+
+onAuthStateChanged(auth, async user=>{
+  if(!user){window.location.href='login.html';return;}
+  ME=user;
+  const snap=await getDoc(doc(db,'users',ME.uid));
+  if(!snap.exists()){window.location.href='login.html';return;}
+  MY=snap.data(); selAvatar=MY.avatar||'🐉'; selColor=MY.color||COLORS[0];
+  document.getElementById('loading').style.display='none';
+  document.getElementById('pg').style.display='block';
+  renderHero(); buildForms(); loadStats();
+});
+
+function renderHero(){
+  const av=document.getElementById('av-big'); av.innerHTML='';
+  if(MY.photoURL&&MY.photoURL.startsWith('http')){const img=new Image();img.src=MY.photoURL;img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%';av.appendChild(img);}
+  else{av.textContent=MY.avatar||'🐉';}
+  document.getElementById('h-user').textContent=MY.username||'—';
+  document.getElementById('h-bio').textContent=MY.bio||'No bio yet';
+  document.getElementById('h-country').textContent=MY.country||'🌍 Global';
+  if(MY.createdAt?.seconds) document.getElementById('h-joined').textContent='Joined '+new Date(MY.createdAt.seconds*1000).toLocaleDateString('en',{month:'long',year:'numeric'});
+}
+
+function buildForms(){
+  document.getElementById('e-user').value=MY.username||'';
+  document.getElementById('e-bio').value=MY.bio||'';
+  const cs=document.getElementById('e-country'); cs.innerHTML='';
+  COUNTRIES.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;if(MY.country===c)o.selected=true;cs.appendChild(o);});
+  const eg=document.getElementById('eg-sm'); eg.innerHTML='';
+  AVICS.forEach(a=>{const s=document.createElement('div');s.className='es'+(a===selAvatar?' on':'');s.textContent=a;s.onclick=()=>{selAvatar=a;eg.querySelectorAll('.es').forEach(x=>x.classList.remove('on'));s.classList.add('on');};eg.appendChild(s);});
+  const sw=document.getElementById('swatches'); sw.innerHTML='';
+  COLORS.forEach(c=>{const d=document.createElement('div');d.className='sw'+(c===selColor?' on':'');d.style.background=c;d.onclick=()=>{selColor=c;sw.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));d.classList.add('on');};sw.appendChild(d);});
+  document.getElementById('ph-inp').addEventListener('change',async e=>{
+    const file=e.target.files[0];if(!file)return;toast('Uploading...');
+    try{const fd=new FormData();fd.append('file',file);fd.append('upload_preset','hidden Hydra');const r=await fetch('https://api.cloudinary.com/v1_1/dyspzzb3z/image/upload',{method:'POST',body:fd});const d=await r.json();if(d.secure_url){newPhoto=d.secure_url;const av=document.getElementById('av-big');av.innerHTML='';const img=new Image();img.src=newPhoto;img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%';av.appendChild(img);toast('Photo ready — save to apply','ok');}else toast('Upload failed','err');}catch(err){toast('Error: '+err.message,'err');}
+  });
+}
+
+async function loadStats(){
+  try{const[d,g]=await Promise.all([getDocs(query(collection(db,'chats'),where('members','array-contains',ME.uid))),getDocs(query(collection(db,'groups'),where('members','array-contains',ME.uid)))]);document.getElementById('st-dms').textContent=d.size;document.getElementById('st-grps').textContent=g.size;}catch(_){}
+}
+
+window.doSave=async function(){
+  const username=document.getElementById('e-user').value.trim();
+  const bio=document.getElementById('e-bio').value.trim();
+  const country=document.getElementById('e-country').value;
+  if(!username||username.length<2){toast('Username too short','err');return;}
+  const btn=document.getElementById('save-btn'); const txt=document.getElementById('save-txt'); const spin=document.getElementById('save-spin');
+  btn.disabled=true; txt.style.display='none'; spin.style.display='inline-block';
+  try{
+    const upd={username,bio,country,avatar:selAvatar,color:selColor};
+    if(newPhoto) upd.photoURL=newPhoto;
+    await updateDoc(doc(db,'users',ME.uid),upd);
+    Object.assign(MY,upd); newPhoto=null; renderHero();
+    toast('Saved!','ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+  btn.disabled=false; txt.style.display='inline'; spin.style.display='none';
+};
+
+window.doLogout=async function(){
+  if(!confirm('Sign out?'))return;
+  try{await set(ref(rtdb,`presence/${ME.uid}`),{online:false,uid:ME.uid,lastSeen:rtTs()});}catch(_){}
+  await signOut(auth); window.location.href='login.html';
+};
+</script>
+</body>
+</html>
