@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Security — Hidden Hydra</title>
+  <meta name="theme-color" content="#05050A"/>
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="assets/logo-32.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+<nav class="pnav" id="nav">
+  <a href="index.html" class="logo"><img src="assets/logo-64.png" alt="">HIDDEN HYDRA</a>
+  <div class="nav-links">
+    <a href="features.html">Features</a>
+    <a href="security.html">Security</a>
+    <a href="about.html">About</a>
+    <a href="help.html">Help</a>
+    <a href="login.html" class="nav-enter">Enter</a>
+    <button id="nav-burger" aria-label="menu"></button>
+  </div>
+</nav>
+<div id="nav-mobile">
+  <a href="index.html">Home</a><a href="features.html">Features</a><a href="about.html">About</a><a href="help.html">Help</a><a href="privacy.html">Privacy</a>
+</div>
+
+<div class="doc-wrap">
+  <h1>The Security Model</h1>
+  <p class="doc-lead">How Hidden Hydra keeps your words unreadable to everyone except the people you send them to — including us.</p>
+
+  <div class="doc-card">
+    <h2 id="d1">1 · Identity keys</h2>
+    <p>When you join, your browser generates an <b>ECDH P-256 key pair</b> using the Web Crypto API.</p>
+    <ul>
+      <li>The <b>private key</b> is stored only in your browser's local storage. It is never uploaded, never sent, never derivable from the server.</li>
+      <li>The <b>public key</b> is published on your profile document so friends can encrypt toward you.</li>
+      <li>Your profile page shows a <b>fingerprint</b> of your public key so you can verify it out-of-band.</li>
+    </ul>
+  </div>
+
+  <div class="doc-card">
+    <h2 id="d2">2 · Direct messages</h2>
+    <p>For a DM, both devices perform an <b>ECDH key agreement</b>: <code>shared = ECDH(myPrivate, theirPublic)</code>. The shared secret is stretched with <b>HKDF-SHA256</b> into an <b>AES-256-GCM</b> message key. Every message is encrypted with a fresh random 12-byte IV. Only the two participants can compute this key.</p>
+  </div>
+
+  <div class="doc-card">
+    <h2 id="d3">3 · Groups &amp; world rooms</h2>
+    <p>Rooms use a random <b>room key</b> per <b>epoch</b>. The room key is <i>wrapped</i> (encrypted) individually for every member with an ephemeral ECDH exchange and stored in <code>groups/{room}/keys/{member}</code>. Any member who holds the raw room key automatically wraps it for members who don't have it yet, so keys propagate while people are online. Messages carry their epoch, so history you already hold keys for stays readable after a re-key.</p>
+    <p class="note">Honest limitation: if <i>nobody</i> who holds a room key comes online while you join, your client waits, then offers a <b>new epoch</b> instead of silently showing plaintext. World rooms also track a capped member list (2,000) for key distribution.</p>
+  </div>
+
+  <div class="doc-card">
+    <h2 id="d4">4 · What is and isn't encrypted</h2>
+    <ul>
+      <li><b>Encrypted:</b> message text, attached image references, reply quotes.</li>
+      <li><b>Not encrypted (metadata):</b> sender id/name/emblem, timestamp, room id, reactions, typing indicators — the same metadata model used by mainstream E2EE messengers.</li>
+      <li><b>Not encrypted by design:</b> the <b>Hydra AI</b> room (the AI must read your text to answer) and system/bot messages. These rooms are clearly labelled in the app.</li>
+      <li><b>Images:</b> encrypted references; the uploaded file itself lives on imgbb's CDN. Don't attach images you wouldn't trust to a photo host.</li>
+    </ul>
+  </div>
+
+  <div class="doc-card">
+    <h2 id="d5">5 · Secrets on the server</h2>
+    <p>The Groq (AI) and imgbb API keys exist <b>only</b> as Vercel environment variables, used by the serverless functions <code>/api/ai</code> and <code>/api/upload</code>. Browsers never receive them. The Firebase web config in the client is a public identifier by design; access control is enforced by Firestore / Realtime Database security rules.</p>
+  </div>
+
+  <div class="doc-card">
+    <h2 id="d6">6 · Moderation &amp; bans</h2>
+    <p>Your own client asks the moderation model about outgoing world/group messages and applies strikes to <b>its own</b> profile (3 warnings → ban). Severe threats are banned instantly. Reports via <code>/report</code> are logged for human review. Because messages are E2EE, moderation sees only what your device voluntarily submits — exactly like the message author reading their own text.</p>
+  </div>
+
+  <div style="text-align:center;margin-top:36px">
+    <a class="btn-gold" href="login.html">Enter encrypted →</a>
+  </div>
+</div>
+
+<footer class="pfoot">
+  <a href="index.html" class="logo"><img src="assets/logo-64.png" alt="">HIDDEN HYDRA</a>
+  <div class="foot-links">
+    <a href="features.html">Features</a><a href="about.html">About</a><a href="help.html">Help</a><a href="privacy.html">Privacy</a>
+  </div>
+</footer>
+
+<script type="module">
+import { icon } from './js/icons.js';
+document.getElementById('nav-burger').innerHTML = icon('menu','',22);
+const bm=document.getElementById('nav-mobile');
+document.getElementById('nav-burger').onclick=e=>{e.stopPropagation();bm.classList.toggle('open');};
+document.addEventListener('click',e=>{if(!e.target.closest('#nav-mobile'))bm.classList.remove('open');});
+window.addEventListener('scroll',()=>document.getElementById('nav').classList.toggle('scrolled',scrollY>60));
+document.querySelectorAll('.doc-card h2').forEach(h=>{ h.insertAdjacentHTML('afterbegin', icon('lock','',16)); });
+</script>
+</body>
+</html>

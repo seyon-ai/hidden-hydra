@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Help — Hidden Hydra</title>
+  <meta name="theme-color" content="#05050A"/>
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="assets/logo-32.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+<nav class="pnav" id="nav">
+  <a href="index.html" class="logo"><img src="assets/logo-64.png" alt="">HIDDEN HYDRA</a>
+  <div class="nav-links">
+    <a href="features.html">Features</a>
+    <a href="security.html">Security</a>
+    <a href="about.html">About</a>
+    <a href="help.html">Help</a>
+    <a href="login.html" class="nav-enter">Enter</a>
+    <button id="nav-burger" aria-label="menu"></button>
+  </div>
+</nav>
+<div id="nav-mobile">
+  <a href="index.html">Home</a><a href="features.html">Features</a><a href="security.html">Security</a><a href="about.html">About</a><a href="privacy.html">Privacy</a>
+</div>
+
+<div class="doc-wrap">
+  <h1>Help &amp; FAQ</h1>
+  <p class="doc-lead">Commands, how-tos and the answers people ask for most.</p>
+
+  <div class="doc-card">
+    <h2>Chat commands</h2>
+    <ul>
+      <li><code>/ai [question]</code> — ask Hydra AI anything, in any room.</li>
+      <li><code>/help</code> — list the commands.</li>
+      <li><code>/report @username</code> — send a report to the moderation log.</li>
+      <li><code>/rules</code> — the community rules.</li>
+    </ul>
+    <p>Tip: the <b>Hydra AI</b> row at the top of the World tab is your own private assistant room — nobody else can read it.</p>
+  </div>
+
+  <div class="doc-card">
+    <h2>How do I…</h2>
+    <div class="step-row"><div class="step-n">?</div><p><b>Send an image?</b> Tap the image button, or paste (Ctrl/Cmd+V), or drag files onto the chat. Up to 4 per message.</p></div>
+    <div class="step-row"><div class="step-n">?</div><p><b>Reply or react?</b> Hover a message (or tap it on mobile) for the action bar: react, reply, copy, delete.</p></div>
+    <div class="step-row"><div class="step-n">?</div><p><b>Hide the side panels?</b> Use the panel buttons in the header — on desktop they collapse, on mobile they slide over. The chat list button is the three-line icon.</p></div>
+    <div class="step-row"><div class="step-n">?</div><p><b>Join a private group?</b> Explore tab → enter the invite code → JOIN.</p></div>
+    <div class="step-row"><div class="step-n">?</div><p><b>Change my look?</b> Profile page: photo, emblem, color, bio, country.</p></div>
+  </div>
+
+  <div class="doc-card faq">
+    <h2>FAQ</h2>
+    <details><summary>Is my chat really encrypted?</summary><div>Yes — DMs and group messages are sealed on your device with AES-256-GCM before upload. See the <a href="security.html" style="color:var(--gold)">Security page</a> for the full model, including what metadata stays visible.</div></details>
+    <details><summary>A room says “Syncing encryption keys”.</summary><div>Group keys are wrapped by members who already hold them. Wait for someone with the key to open the room, press <b>Retry</b>, or start a <b>new epoch</b> from the banner or group info.</div></details>
+    <details><summary>The AI doesn't answer.</summary><div>The AI runs through a serverless function that needs <code>GROQ_API_KEY</code> set in your Vercel environment variables. If it's missing you'll see a friendly bot message saying so.</div></details>
+    <details><summary>Image upload fails.</summary><div>Same idea: <code>IMGBB_API_KEY</code> must be set on Vercel. Images are compressed on-device first (max 1600px).</div></details>
+    <details><summary>I lost my phone / cleared browser data.</summary><div>Your encryption private key lives in that browser only. Old encrypted history from groups you can re-join will resync keys from members; DMs sent to your old key stay private to the old device — that's what end-to-end means.</div></details>
+    <details><summary>Why anonymous auth?</summary><div>Zero friction and zero personal data. Your identity is the profile you choose, protected by Firestore rules keyed to your anonymous UID.</div></details>
+  </div>
+
+  <div style="text-align:center;margin-top:36px">
+    <a class="btn-gold" href="chat.html">Back to chat →</a>
+  </div>
+</div>
+
+<footer class="pfoot">
+  <a href="index.html" class="logo"><img src="assets/logo-64.png" alt="">HIDDEN HYDRA</a>
+  <div class="foot-links">
+    <a href="features.html">Features</a><a href="security.html">Security</a><a href="about.html">About</a><a href="privacy.html">Privacy</a>
+  </div>
+</footer>
+
+<script type="module">
+import { icon } from './js/icons.js';
+document.getElementById('nav-burger').innerHTML = icon('menu','',22);
+const bm=document.getElementById('nav-mobile');
+document.getElementById('nav-burger').onclick=e=>{e.stopPropagation();bm.classList.toggle('open');};
+document.addEventListener('click',e=>{if(!e.target.closest('#nav-mobile'))bm.classList.remove('open');});
+window.addEventListener('scroll',()=>document.getElementById('nav').classList.toggle('scrolled',scrollY>60));
+document.querySelectorAll('.doc-card h2').forEach(h=>{ h.insertAdjacentHTML('afterbegin', icon('help','',16)); });
+</script>
+</body>
+</html>

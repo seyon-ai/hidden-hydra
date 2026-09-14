@@ -1,15 +1,21 @@
 // firebase-config.js — Hidden Hydra
-// All Firebase imports and initialization in one place
+// All Firebase imports and initialization in one place.
+//
+// NOTE ON SECRETS: the values below are the *public* Firebase web config —
+// they are identifiers, not secrets (like a client-id). Real protection comes
+// from Firestore/RTDB security rules + your Firebase console allow-lists.
+// The TRUE secrets (GROQ_API_KEY, IMGBB_API_KEY) are NOT here anymore:
+// they live in Vercel environment variables and are used only by /api/*.
 
 import { initializeApp }                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged, signOut }
                                          from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
-  collection, query, where, onSnapshot, serverTimestamp, arrayUnion, arrayRemove
+  collection, query, where, limit, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, increment
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
-  getDatabase, ref, set, push, remove, onValue, onChildAdded, off,
+  getDatabase, ref, set, push, remove, onValue, onChildAdded, onChildChanged, off,
   serverTimestamp as rtTs, onDisconnect,
   query as dbQuery, orderByChild, limitToLast, get, update
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -24,11 +30,6 @@ const FIREBASE_CONFIG = {
   appId:             "1:1487060887:web:402fea888cdf486f8d0ed2"
 };
 
-export const CLOUDINARY = {
-  cloudName:    "dyspzzb3z",
-  uploadPreset: "hidden Hydra"
-};
-
 const firebaseApp = initializeApp(FIREBASE_CONFIG);
 
 export const auth  = getAuth(firebaseApp);
@@ -39,8 +40,8 @@ export const rtdb  = getDatabase(firebaseApp);
 export {
   signInAnonymously, onAuthStateChanged, signOut,
   doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
-  collection, query, where, onSnapshot, serverTimestamp, arrayUnion, arrayRemove,
-  ref, set, push, remove, onValue, onChildAdded, off,
+  collection, query, where, limit, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, increment,
+  ref, set, push, remove, onValue, onChildAdded, onChildChanged, off,
   rtTs, onDisconnect,
   dbQuery, orderByChild, limitToLast, get, update
 };

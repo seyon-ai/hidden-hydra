@@ -4,22 +4,27 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Join — Hidden Hydra</title>
-  <link rel="stylesheet" href="global.css">
-  <link rel="stylesheet" href="login.css">
+  <meta name="theme-color" content="#05050A"/>
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="assets/logo-32.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/login.css">
 </head>
 <body>
 <div id="toasts"></div>
 <div class="login-page">
   <div class="login-left">
-    <a href="index.html" class="back-link">← Back</a>
+    <a href="index.html" class="back-link" id="back-link">Back</a>
     <div class="brand">
-      <div class="brand-icon">🐉</div>
+      <img class="brand-icon" src="assets/logo.png" alt="Hidden Hydra emblem">
       <h1>HIDDEN<br>HYDRA</h1>
       <p class="tagline">Where shadows speak</p>
+      <div class="e2ee-note" id="e2ee-note">End-to-end encrypted by default</div>
     </div>
     <div class="testimonial">
       <div class="tq">"Connected me with people I never would have met."</div>
-      <div class="ta">🦊 shadow_wolf · Tokyo</div>
+      <div class="ta" id="t-author">shadow_wolf · Tokyo</div>
     </div>
   </div>
   <div class="login-right">
@@ -33,14 +38,14 @@
           <div class="sd">3</div>
         </div>
         <h2 class="step-title">Choose Identity</h2>
-        <p class="step-sub">Pick an avatar or upload a photo</p>
+        <p class="step-sub">Pick an emblem or upload a photo</p>
         <div class="av-stage">
           <div class="av-big" id="av-big" onclick="document.getElementById('photo-inp').click()">
-            <span id="av-show">🐉</span>
+            <span id="av-show" style="display:flex"></span>
             <div class="av-hint">UPLOAD</div>
           </div>
           <input type="file" id="photo-inp" accept="image/*" style="display:none">
-          <button class="btn-ghost" style="font-size:11px;padding:8px 14px" onclick="document.getElementById('photo-inp').click()">📸 Upload Photo</button>
+          <button class="btn-ghost" style="font-size:11px;padding:8px 14px" id="upload-btn" onclick="document.getElementById('photo-inp').click()">Upload Photo</button>
         </div>
         <div class="emoji-grid" id="emoji-grid"></div>
         <div class="color-row">
@@ -48,7 +53,7 @@
           <div class="swatches" id="swatches"></div>
         </div>
         <button class="btn-gold" style="width:100%;justify-content:center;margin-bottom:8px" onclick="goStep(2)">Continue →</button>
-        <button class="btn-ghost" style="width:100%;text-align:center" onclick="quickJoin()">⚡ 1-Click Quick Join</button>
+        <button class="btn-ghost" style="width:100%;justify-content:center" id="quick-btn" onclick="quickJoin()">1-Click Quick Join</button>
       </div>
 
       <!-- Step 2 -->
@@ -60,14 +65,14 @@
         </div>
         <h2 class="step-title">Your Details</h2>
         <p class="step-sub">Tell the world who you are</p>
-        <div class="ig"><label>USERNAME *</label>
+        <div class="ig"><label>Username *</label>
           <input class="ii" id="inp-user" placeholder="shadow_wolf" maxlength="24">
           <div class="hint" id="user-hint"></div>
         </div>
-        <div class="ig"><label>BIO</label>
+        <div class="ig"><label>Bio</label>
           <input class="ii" id="inp-bio" placeholder="A wanderer of the digital realm..." maxlength="80">
         </div>
-        <div class="ig"><label>COUNTRY</label>
+        <div class="ig"><label>Country</label>
           <select class="ii" id="inp-country"></select>
         </div>
         <div style="display:flex;gap:8px">
@@ -96,7 +101,7 @@
         <div style="display:flex;gap:8px">
           <button class="btn-ghost" onclick="goStep(2)">← Back</button>
           <button class="btn-gold" id="enter-btn" style="flex:1;justify-content:center" onclick="createProfile()">
-            <span id="enter-txt">ENTER 🐉</span>
+            <span id="enter-txt">ENTER</span>
             <div class="ring sm" id="enter-spin" style="display:none;border-top-color:var(--bg)"></div>
           </button>
         </div>
@@ -109,31 +114,48 @@
 <script type="module">
 import { auth, db, rtdb, signInAnonymously, onAuthStateChanged,
          doc, setDoc, getDoc, serverTimestamp,
-         ref, set, rtTs } from './firebase-config.js';
+         ref, set, rtTs } from './js/firebase-config.js';
+import { icon, iconEl, AVATARS, flagImg } from './js/icons.js';
+import { uploadImage } from './js/api.js';
+import { ensureKeyPair } from './js/crypto.js';
 
-const EMOJIS  = ['🐉','🦊','🐺','🦁','🐯','🦋','🔥','⚡','🌙','💎','🌊','🦅','🐬','🦝','🎭','🌸','🐙','🦄','⭐','🗡️'];
 const COLORS  = ['#C9A84C','#C0392B','#8E44AD','#2980B9','#16A085','#D35400','#E91E63','#00BCD4'];
-const COUNTRIES = [
-  '🌍 Global','🇺🇸 USA','🇬🇧 UK','🇮🇳 India','🇵🇰 Pakistan','🇧🇩 Bangladesh',
-  '🇩🇪 Germany','🇫🇷 France','🇯🇵 Japan','🇨🇳 China','🇧🇷 Brazil','🇷🇺 Russia',
-  '🇰🇷 Korea','🇸🇦 Saudi Arabia','🇦🇪 UAE','🇨🇦 Canada','🇦🇺 Australia',
-  '🇲🇽 Mexico','🇹🇷 Turkey','🇮🇹 Italy','🇪🇸 Spain','🇵🇭 Philippines',
-  '🇵🇱 Poland','🇺🇦 Ukraine','🇸🇬 Singapore','🇳🇬 Nigeria','🇮🇩 Indonesia'
+const COUNTRY_CODES = [
+  ['GLOBAL','Global'],['US','USA'],['GB','UK'],['IN','India'],['PK','Pakistan'],['BD','Bangladesh'],
+  ['DE','Germany'],['FR','France'],['JP','Japan'],['CN','China'],['BR','Brazil'],['RU','Russia'],
+  ['KR','Korea'],['SA','Saudi Arabia'],['AE','UAE'],['CA','Canada'],['AU','Australia'],
+  ['MX','Mexico'],['TR','Turkey'],['IT','Italy'],['ES','Spain'],['PH','Philippines'],
+  ['PL','Poland'],['UA','Ukraine'],['SG','Singapore'],['NG','Nigeria'],['ID','Indonesia']
 ];
+// build "🇺🇸 USA"-style strings from ISO codes (legacy-compatible) without typing flag emojis
+const flagEmoji = cc => cc === 'GLOBAL'
+  ? String.fromCodePoint(0x1F30D)
+  : String.fromCodePoint(...[...cc].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
+const COUNTRIES = COUNTRY_CODES.map(([cc, name]) => flagEmoji(cc) + ' ' + name);
 
-let selEmoji = EMOJIS[0], selColor = COLORS[0], photoURL = null;
+let selAvatar = AVATARS[0], selColor = COLORS[0], photoURL = null;
 
 function toast(msg,type=''){const tc=document.getElementById('toasts');const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;tc.appendChild(t);setTimeout(()=>t.remove(),3200);}
 
-// Build emoji grid
+/* static icons */
+document.getElementById('back-link').innerHTML = icon('back','',13) + ' Back';
+document.getElementById('e2ee-note').innerHTML = icon('lock','',14) + ' End-to-end encrypted by default';
+document.getElementById('t-author').innerHTML = iconEl('av-fox','',14).outerHTML + ' shadow_wolf · Tokyo';
+document.getElementById('upload-btn').innerHTML = icon('camera','',13) + ' Upload Photo';
+document.getElementById('quick-btn').innerHTML = icon('zap','',13) + ' 1-Click Quick Join';
+document.getElementById('av-show').innerHTML = icon('av-dragon','',40);
+
+/* emblem grid (replaces the old emoji picker) */
 const eg = document.getElementById('emoji-grid');
-EMOJIS.forEach(e=>{
-  const d=document.createElement('div'); d.className='eg-item'+(e===selEmoji?' on':''); d.textContent=e;
-  d.onclick=()=>{selEmoji=e;document.querySelectorAll('.eg-item').forEach(x=>x.classList.remove('on'));d.classList.add('on');if(!photoURL)document.getElementById('av-show').textContent=e;};
+AVATARS.forEach(a=>{
+  const d=document.createElement('div'); d.className='eg-item'+(a===selAvatar?' on':'');
+  d.appendChild(iconEl('av-'+a,'',20));
+  d.title=a;
+  d.onclick=()=>{selAvatar=a;document.querySelectorAll('.eg-item').forEach(x=>x.classList.remove('on'));d.classList.add('on');if(!photoURL)document.getElementById('av-show').innerHTML=icon('av-'+a,'',40);};
   eg.appendChild(d);
 });
 
-// Build color swatches
+/* color swatches */
 const sw=document.getElementById('swatches');
 COLORS.forEach(c=>{
   const d=document.createElement('div');d.className='sw'+(c===selColor?' on':'');d.style.background=c;
@@ -141,30 +163,27 @@ COLORS.forEach(c=>{
   sw.appendChild(d);
 });
 
-// Build country select
+/* country select (native select keeps flag emojis; previews show real flag images) */
 const cs=document.getElementById('inp-country');
 COUNTRIES.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;cs.appendChild(o);});
 
-// Photo upload
+/* photo upload → imgbb via serverless proxy */
 document.getElementById('photo-inp').addEventListener('change', async e=>{
   const file=e.target.files[0]; if(!file) return;
   toast('Uploading photo...');
   try {
-    const fd=new FormData(); fd.append('file',file); fd.append('upload_preset','hidden Hydra');
-    const r=await fetch('https://api.cloudinary.com/v1_1/dyspzzb3z/image/upload',{method:'POST',body:fd});
-    const d=await r.json();
-    if(d.secure_url){
-      photoURL=d.secure_url;
-      const av=document.getElementById('av-big'); av.innerHTML='';
-      const img=new Image(); img.src=photoURL; img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%';
-      const hint=document.createElement('div'); hint.className='av-hint'; hint.textContent='CHANGE';
-      av.appendChild(img); av.appendChild(hint);
-      toast('Photo ready!','ok');
-    } else toast('Upload failed','err');
+    const url = await uploadImage(file);
+    photoURL=url;
+    const av=document.getElementById('av-big'); av.innerHTML='';
+    const img=new Image(); img.src=photoURL; img.alt='your photo';
+    img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%';
+    const hint=document.createElement('div'); hint.className='av-hint'; hint.textContent='CHANGE';
+    av.appendChild(img); av.appendChild(hint);
+    toast('Photo ready!','ok');
   } catch(err){ toast('Upload error: '+err.message,'err'); }
 });
 
-// Redirect if already has profile
+/* redirect if profile already exists */
 onAuthStateChanged(auth, async user=>{
   if(user){ const s=await getDoc(doc(db,'users',user.uid)); if(s.exists()) window.location.href='chat.html'; }
 });
@@ -174,11 +193,11 @@ window.goStep = function(n){
     const u=document.getElementById('inp-user').value.trim();
     if(!u||u.length<2){ toast('Username must be at least 2 characters','err'); return; }
     const pav=document.getElementById('pav'); pav.innerHTML='';
-    if(photoURL){ const img=new Image(); img.src=photoURL; img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%'; pav.appendChild(img); }
-    else pav.textContent=selEmoji;
+    if(photoURL){ const img=new Image(); img.src=photoURL; img.alt=''; img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%'; pav.appendChild(img); }
+    else pav.innerHTML=icon('av-'+selAvatar,'',26);
     document.getElementById('pname').textContent=u;
     document.getElementById('pbio').textContent=document.getElementById('inp-bio').value||'No bio';
-    document.getElementById('pcountry').textContent=document.getElementById('inp-country').value;
+    document.getElementById('pcountry').innerHTML=flagImg(cs.value,16)+' '+cs.value.replace(/[\u{1F1E6}-\u{1F1FF}]{2}/u,'').trim();
   }
   document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
   document.getElementById('step'+n).classList.add('active');
@@ -196,11 +215,12 @@ window.createProfile = async function(){
   try {
     let user=auth.currentUser;
     if(!user){ const c=await signInAnonymously(auth); user=c.user; }
+    const publicKey = await ensureKeyPair(user.uid);   // E2EE identity from day one
     await setDoc(doc(db,'users',user.uid),{
       uid:user.uid, username, bio, country,
-      avatar:selEmoji, color:selColor,
-      photoURL:photoURL||'', friends:[],
-      createdAt:serverTimestamp(), online:true
+      avatar:selAvatar, color:selColor,
+      photoURL:photoURL||'', friends:[], publicKey,
+      createdAt:serverTimestamp(), online:true, sentCount:0
     });
     await set(ref(rtdb,`presence/${user.uid}`),{online:true,uid:user.uid,lastSeen:rtTs()});
     window.location.href='chat.html';

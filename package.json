@@ -1,0 +1,11 @@
+{
+  "name": "hidden-hydra",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Anonymous end-to-end encrypted global chat — static frontend + Vercel serverless API",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "dev": "node dev-server.mjs"
+  }
+}

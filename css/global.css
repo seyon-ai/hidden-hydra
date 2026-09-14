@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════
-   HIDDEN HYDRA — global.css
+   HIDDEN HYDRA — global.css (v2)
    ═══════════════════════════════════════ */
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Raleway:wght@300;400;500;600&family=Cormorant+Garamond:ital,wght@0,300;1,300&display=swap');
 
@@ -14,7 +14,7 @@
   --border:  rgba(201,168,76,0.13);
   --text:    #E8E0D0;
   --dim:     #8A7F6A;
-  --faint:   #2A2520;
+  --faint:   #57503F;
   --online:  #2ECC71;
   --danger:  #C0392B;
   --r:       6px;
@@ -23,10 +23,10 @@
 
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
-html { height:100%; height:100dvh; }
+html { height: 100%; height: 100dvh; }
 
 body {
-  height:100%; height:100dvh;
+  height: 100%; height: 100dvh;
   background:var(--bg);
   color:var(--text);
   font-family:'Raleway', sans-serif;
@@ -47,6 +47,15 @@ body::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
   opacity:.5;
 }
+
+/* ── SVG icon system ── */
+svg.icon {
+  fill:none; stroke:currentColor; stroke-width:1.7;
+  stroke-linecap:round; stroke-linejoin:round;
+  display:inline-block; vertical-align:middle; flex-shrink:0;
+}
+img.flag { border-radius:2px; object-fit:cover; vertical-align:middle; display:inline-block; box-shadow:0 0 0 1px rgba(255,255,255,.08); }
+span.ctry { font-size:.9em; }
 
 /* ── Typography ── */
 h1, h2, h3 { font-family:'Cinzel', serif; }
@@ -78,7 +87,7 @@ h1, h2, h3 { font-family:'Cinzel', serif; }
   color:var(--bg); font-family:'Cinzel', serif;
   font-size:11px; font-weight:700; letter-spacing:3px;
   cursor:pointer; transition:all .3s; text-transform:uppercase;
-  display:inline-flex; align-items:center; gap:8px;
+  display:inline-flex; align-items:center; gap:8px; text-decoration:none;
 }
 .btn-gold:hover {
   background:linear-gradient(135deg, var(--gold), var(--gold2));
@@ -92,6 +101,7 @@ h1, h2, h3 { font-family:'Cinzel', serif; }
   border-radius:var(--r); color:var(--dim);
   font-family:'Cinzel', serif; font-size:11px; letter-spacing:2px;
   cursor:pointer; transition:all .25s; text-transform:uppercase;
+  display:inline-flex; align-items:center; gap:7px; text-decoration:none;
 }
 .btn-ghost:hover { border-color:var(--gold3); color:var(--gold); }
 
@@ -107,7 +117,7 @@ h1, h2, h3 { font-family:'Cinzel', serif; }
 #toasts {
   position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
   z-index:9999; display:flex; flex-direction:column; gap:7px; align-items:center;
-  pointer-events:none;
+  pointer-events:none; max-width:92vw;
 }
 .toast {
   background:var(--s2); border:1px solid var(--gold3);
@@ -115,7 +125,8 @@ h1, h2, h3 { font-family:'Cinzel', serif; }
   font-size:13px; color:var(--text);
   box-shadow:0 8px 30px rgba(0,0,0,.5);
   animation:toastIn .3s ease, toastOut .3s ease 2.7s forwards;
-  white-space:nowrap; pointer-events:none;
+  white-space:nowrap; pointer-events:none; max-width:92vw;
+  overflow:hidden; text-overflow:ellipsis;
 }
 .toast.err { border-color:var(--danger); }
 .toast.ok  { border-color:var(--online); }
@@ -125,15 +136,16 @@ h1, h2, h3 { font-family:'Cinzel', serif; }
   position:fixed; inset:0;
   background:rgba(0,0,0,.82); backdrop-filter:blur(6px);
   display:flex; align-items:center; justify-content:center;
-  z-index:8000; animation:fadeIn .2s ease;
+  z-index:8000; animation:fadeIn .2s ease; padding:16px;
 }
 .modal {
   background:var(--s2); border:1px solid var(--border);
   border-radius:var(--r2); padding:36px;
-  width:380px; max-width:94vw; position:relative;
+  width:380px; max-width:94vw; max-height:88dvh; overflow-y:auto; position:relative;
   box-shadow:0 20px 60px rgba(0,0,0,.7);
   animation:scaleIn .25s cubic-bezier(.34,1.56,.64,1);
 }
+.modal.wide { width:440px; }
 .modal::before {
   content:''; position:absolute; top:0; left:12%; right:12%; height:1px;
   background:linear-gradient(90deg, transparent, var(--gold), transparent);
@@ -145,7 +157,7 @@ h1, h2, h3 { font-family:'Cinzel', serif; }
 .modal-close {
   position:absolute; top:13px; right:13px;
   background:none; border:none; color:var(--dim);
-  font-size:22px; cursor:pointer; line-height:1;
+  cursor:pointer; line-height:1; display:flex;
 }
 .modal-close:hover { color:var(--gold); }
 
@@ -156,11 +168,11 @@ h1, h2, h3 { font-family:'Cinzel', serif; }
   animation:pulseDot 2s infinite;
 }
 
-/* ── Icon grid (for group creation) ── */
+/* ── Icon grid (group creation / avatars) ── */
 .icon-grid { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
 .ig-item {
-  font-size:22px; cursor:pointer; padding:4px; border-radius:5px;
-  border:1px solid transparent; transition:all .2s;
+  cursor:pointer; padding:6px; border-radius:6px; color:var(--gold);
+  border:1px solid transparent; transition:all .2s; display:flex;
 }
 .ig-item:hover { background:var(--s3); }
 .ig-item.on { background:rgba(201,168,76,.14); border-color:var(--gold3); }

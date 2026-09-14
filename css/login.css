@@ -1,4 +1,4 @@
-/* login.css */
+/* login.css — v2 */
 .login-page { display:flex; min-height:100dvh; position:relative; z-index:1; }
 
 .login-left {
@@ -14,23 +14,26 @@
   background:radial-gradient(circle,rgba(201,168,76,.07) 0%,transparent 70%);
   pointer-events:none;
 }
-.back-link { color:var(--dim); text-decoration:none; font-size:12px; letter-spacing:2px; text-transform:uppercase; transition:color .2s; margin-bottom:40px; display:inline-block; }
+.back-link { color:var(--dim); text-decoration:none; font-size:12px; letter-spacing:2px; text-transform:uppercase; transition:color .2s; margin-bottom:40px; display:inline-flex; align-items:center; gap:6px; }
 .back-link:hover { color:var(--gold); }
 .brand { flex:1; display:flex; flex-direction:column; justify-content:center; }
-.brand-icon { font-size:72px; margin-bottom:16px; display:block; animation:float 4s ease-in-out infinite; filter:drop-shadow(0 0 20px rgba(201,168,76,.3)); }
-.brand h1 { font-family:'Cinzel',serif; font-size:46px; font-weight:900; color:var(--gold); line-height:1; letter-spacing:4px; text-shadow:0 0 40px rgba(201,168,76,.2); }
+.brand-icon { width:96px; height:96px; margin-bottom:18px; animation:float 4s ease-in-out infinite; filter:drop-shadow(0 0 24px rgba(201,168,76,.35)); border-radius:50%; }
+.brand h1 { font-family:'Cinzel',serif; font-size:44px; font-weight:900; color:var(--gold); line-height:1; letter-spacing:4px; text-shadow:0 0 40px rgba(201,168,76,.2); }
 .tagline { font-family:'Cormorant Garamond',serif; font-size:18px; font-style:italic; color:var(--dim); margin-top:12px; }
+.e2ee-note { display:flex; align-items:center; gap:8px; margin-top:18px; font-size:11px; letter-spacing:1px; color:var(--online); }
 .testimonial { background:var(--s2); border:1px solid var(--border); border-radius:var(--r2); padding:20px; }
 .tq { font-family:'Cormorant Garamond',serif; font-size:15px; font-style:italic; color:var(--text); margin-bottom:10px; line-height:1.5; }
-.ta { font-size:11px; letter-spacing:1px; color:var(--dim); }
+.ta { font-size:11px; letter-spacing:1px; color:var(--dim); display:flex; align-items:center; gap:7px; }
+.ta svg.icon { color:var(--gold3); }
 
 .login-right { flex:1; display:flex; align-items:center; justify-content:center; padding:40px 24px; background:radial-gradient(ellipse at 60% 40%,rgba(201,168,76,.04) 0%,transparent 60%); }
 
 .login-card {
-  width:100%; max-width:420px;
+  width:100%; max-width:430px;
   background:var(--s2); border:1px solid var(--border);
-  border-radius:var(--r2); padding:36px; position:relative;
+  border-radius:var(--r2); padding:34px; position:relative;
   box-shadow:0 16px 60px rgba(0,0,0,.7);
+  max-height:92dvh; overflow-y:auto;
 }
 .login-card::before {
   content:''; position:absolute; top:0; left:15%; right:15%; height:1px;
@@ -40,7 +43,7 @@
 /* Steps */
 .step { display:none; animation:fadeUp .3s ease; }
 .step.active { display:block; }
-.step-dots { display:flex; align-items:center; margin-bottom:28px; }
+.step-dots { display:flex; align-items:center; margin-bottom:26px; }
 .sd {
   width:26px; height:26px; border-radius:50%;
   background:var(--s1); border:1px solid var(--border);
@@ -53,15 +56,15 @@
 .sl { flex:1; height:1px; background:var(--border); transition:background .3s; }
 .sl.active { background:var(--gold3); }
 .step-title { font-family:'Cinzel',serif; font-size:19px; color:var(--gold); letter-spacing:2px; margin-bottom:6px; }
-.step-sub   { font-size:13px; color:var(--dim); margin-bottom:24px; }
+.step-sub   { font-size:13px; color:var(--dim); margin-bottom:22px; }
 
 /* Avatar */
-.av-stage { display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:20px; }
+.av-stage { display:flex; flex-direction:column; align-items:center; gap:12px; margin-bottom:18px; }
 .av-big {
-  width:80px; height:80px; border-radius:50%;
+  width:84px; height:84px; border-radius:50%;
   border:2px solid var(--gold3); background:var(--s1);
   display:flex; align-items:center; justify-content:center;
-  font-size:42px; cursor:pointer; position:relative; overflow:hidden;
+  cursor:pointer; position:relative; overflow:hidden; color:var(--gold);
   box-shadow:0 0 0 6px rgba(201,168,76,.07); transition:border-color .3s;
 }
 .av-big:hover { border-color:var(--gold); }
@@ -74,15 +77,15 @@
 }
 .av-big:hover .av-hint { opacity:1; }
 
-/* Emoji grid */
+/* Emblem grid (was emoji grid) */
 .emoji-grid { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; margin-bottom:16px; }
 .eg-item {
-  width:34px; height:34px; font-size:20px;
+  width:36px; height:36px;
   display:flex; align-items:center; justify-content:center;
-  border-radius:7px; cursor:pointer; transition:all .15s;
-  border:1px solid transparent;
+  border-radius:8px; cursor:pointer; transition:all .15s;
+  border:1px solid transparent; color:var(--gold);
 }
-.eg-item:hover { background:var(--s3); transform:scale(1.15); }
+.eg-item:hover { background:var(--s3); transform:scale(1.12); }
 .eg-item.on { background:rgba(201,168,76,.14); border-color:var(--gold3); }
 .color-row { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
 .hint { font-size:11px; margin-top:4px; color:var(--dim); }
@@ -97,10 +100,11 @@
   width:52px; height:52px; border-radius:50%;
   background:var(--s3); border:1.5px solid var(--gold3);
   display:flex; align-items:center; justify-content:center;
-  font-size:26px; flex-shrink:0; overflow:hidden;
+  flex-shrink:0; overflow:hidden; color:var(--gold);
 }
 .pav img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
 .pname { font-family:'Cinzel',serif; font-size:15px; color:var(--gold); letter-spacing:1px; }
-.pbio  { font-size:12px; color:var(--dim); margin-top:3px; }
+.pbio  { font-size:12px; color:var(--dim); margin-top:3px; display:flex; align-items:center; gap:6px; }
+.spin-sm { width:14px; height:14px; border-radius:50%; border:2px solid rgba(0,0,0,.2); border-top-color:var(--bg); animation:spin .7s linear infinite; }
 
 @media(max-width:700px) { .login-left { display:none; } .login-right { padding:24px 16px; } .login-card { padding:24px 18px; } }

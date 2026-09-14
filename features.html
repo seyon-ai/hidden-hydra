@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Features — Hidden Hydra</title>
+  <meta name="theme-color" content="#05050A"/>
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="assets/logo-32.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+<nav class="pnav" id="nav">
+  <a href="index.html" class="logo"><img src="assets/logo-64.png" alt="">HIDDEN HYDRA</a>
+  <div class="nav-links">
+    <a href="features.html">Features</a>
+    <a href="security.html">Security</a>
+    <a href="about.html">About</a>
+    <a href="help.html">Help</a>
+    <a href="login.html" class="nav-enter">Enter</a>
+    <button id="nav-burger" aria-label="menu"></button>
+  </div>
+</nav>
+<div id="nav-mobile">
+  <a href="index.html">Home</a><a href="security.html">Security</a><a href="about.html">About</a><a href="help.html">Help</a><a href="privacy.html">Privacy</a>
+</div>
+
+<section class="psec" style="padding-top:150px">
+  <div class="sec-eye">FULL CAPABILITY LIST</div>
+  <h2 class="sec-h">Every feature of the Hydra</h2>
+  <p class="sec-sub">From one-click anonymous entry to end-to-end encrypted group realms — here is everything inside.</p>
+  <div class="feat-grid" id="grid1"></div>
+</section>
+
+<section class="psec" style="padding-top:20px">
+  <div class="sec-eye">IN THE CHAT</div>
+  <h2 class="sec-h">Messages, but richer</h2>
+  <div class="feat-grid" id="grid2"></div>
+</section>
+
+<footer class="pfoot">
+  <a href="index.html" class="logo"><img src="assets/logo-64.png" alt="">HIDDEN HYDRA</a>
+  <div class="foot-links">
+    <a href="features.html">Features</a><a href="security.html">Security</a><a href="about.html">About</a><a href="help.html">Help</a><a href="privacy.html">Privacy</a>
+  </div>
+  <a href="login.html" class="btn-gold">Enter Now →</a>
+</footer>
+
+<script type="module">
+import { icon } from './js/icons.js';
+document.getElementById('nav-burger').innerHTML = icon('menu','',22);
+const bm=document.getElementById('nav-mobile');
+document.getElementById('nav-burger').onclick=e=>{e.stopPropagation();bm.classList.toggle('open');};
+document.addEventListener('click',e=>{if(!e.target.closest('#nav-mobile'))bm.classList.remove('open');});
+window.addEventListener('scroll',()=>document.getElementById('nav').classList.toggle('scrolled',scrollY>60));
+
+const A = [
+  ['zap','1-Click Join','Anonymous auth — pick an emblem, a color and a name. You are in. No email, no password, no phone.'],
+  ['lock','End-to-End Encryption','DMs use ECDH P-256 key agreement; groups use per-epoch AES-256-GCM room keys wrapped for each member. The server stores ciphertext only.','E2EE'],
+  ['globe','World Rooms','Global Lounge, Gaming Den, Tech Talk, Music Vibes and Creative Hub — open to everyone, forever.'],
+  ['msg','Private DMs','Friend requests in, requests out, badge counters, and fully encrypted one-to-one chat.'],
+  ['users','Group Realms','Create public or private groups, share invite codes, manage members, leave or delete.'],
+  ['image','Image Attachments','Attach, paste or drag-drop photos into any chat. Images are compressed on-device and hosted via imgbb.'],
+  ['sparkles','Hydra AI','A private per-user AI assistant (Groq Llama), an AI welcome host, and AI cyberbully moderation with warn-then-ban.','LIVE'],
+  ['eye','Live Presence','Online-now panel, typing indicators, and last-seen timestamps in DM headers.'],
+  ['shield','Safety System','Automatic toxicity detection, 3-strike warnings, permanent bans, and a /report command for humans.'],
+  ['user','Rich Profiles','Photo or emblem, bio, country flag, accent color, message stats and your encryption fingerprint.'],
+  ['panel-left','Adaptive Layout','Collapsible chat and presence panels on desktop; slide-over drawers and safe-area aware input on mobile.'],
+  ['key','Verifiable Keys','Your private key is generated and stored only in your browser. Check its fingerprint on your profile page.']
+];
+const B = [
+  ['reply','Replies & Reactions','Quote any message and react with eight hand-drawn reaction seals.'],
+  ['copy','Copy & Delete','Copy message text, or delete your own messages for everyone.'],
+  ['jump','Jump to Latest','A floating button appears when new messages arrive while you read history.'],
+  ['lock','Encrypted Previews','Chat lists show “Encrypted message” instead of leaking content.'],
+  ['smile','Emoji & Links','Unicode emoji picker for message content, auto-linked URLs, multi-line with Shift+Enter.'],
+  ['refresh','Key Epochs','Stuck key sync? Start a new encryption epoch and members resync automatically.']
+];
+const fill=(id,list)=>{const g=document.getElementById(id);list.forEach(([ic,h,p,tag])=>{const d=document.createElement('div');d.className='fc';d.innerHTML=`<span class="fi">${icon(ic,'',32)}</span><h3>${h}</h3><p>${p}</p>${tag?`<span class="tag">${tag}</span>`:''}`;g.appendChild(d);});};
+fill('grid1',A); fill('grid2',B);
+</script>
+</body>
+</html>
