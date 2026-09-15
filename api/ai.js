@@ -2,34 +2,123 @@
  * /api/ai — Vercel serverless function (Groq proxy)
  *
  * GROQ_API_KEY lives ONLY in Vercel environment variables.
- * Body: { action: 'assistant' | 'welcome' | 'moderate', ... }
+ * Body: { action: 'assistant' | 'welcome' | 'moderate' | 'ping', ... }
  *   assistant: { history: [{role,content}], username }  → { reply }
  *   welcome:   { username, country }                    → { reply }
  *   moderate:  { text }                                 → { verdict: {toxic,severity,reason} }
+ *   ping:      {}                                       → { ok, model, availableModels, test }
+ *
+ * MODEL RESILIENCE (why your AI "stopped working" in Sep 2026):
+ * Groq shut down llama-3.1-8b-instant on 2026-08-16. This function now:
+ *   1. tries   env.GROQ_MODEL → cached model → preference list
+ *   2. on a model-related error, GETs /v1/models with your key,
+ *      picks the best model that actually exists, caches it, retries
+ *   3. handles reasoning models (gpt-oss) that return EMPTY content when
+ *      the token budget is small — bigger budget + reasoning_effort:low
  */
 
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_BASE = 'https://api.groq.com/openai/v1';
+const GROQ_URL  = GROQ_BASE + '/chat/completions';
+
+/* preference order — first one that exists on your account wins */
+const MODEL_PREFS = [
+  'openai/gpt-oss-20b',          // fastest (≈1000 tok/s), recommended replacement
+  'qwen/qwen3.6-27b',
+  'openai/gpt-oss-120b',
+  'llama-3.3-70b-versatile',    // deprecated 2026-08-16, kept as fallback
+  'llama-3.1-8b-instant'        // deprecated 2026-08-16, kept as fallback
+];
+
+let cachedModel = null; // warm within a serverless instance
+
+const isReasoningModel = m => String(m).includes('gpt-oss');
+const isModelError = e =>
+  e?.status === 404 ||
+  /model|does not exist|not found|deprecat|unsupported|retired/i.test(e?.message || '');
+
+async function groqListModels(key) {
+  const res = await fetch(GROQ_BASE + '/models', { headers: { Authorization: `Bearer ${key}` } });
+  if (!res.ok) throw new Error('GET /models failed: HTTP ' + res.status);
+  const d = await res.json();
+  return (d.data || []).map(m => m.id);
+}
+function pickModel(ids) {
+  for (const p of MODEL_PREFS) if (ids.includes(p)) return p;
+  return ids[0] || MODEL_PREFS[0];
+}
 
 async function askGroq(env, messages, systemPrompt) {
-  const key = env.GROQ_API_KEY;
+  const key = env.GROQ_API_KEY || env.GROQ_KEY;   // tolerate common alias
   if (!key) throw Object.assign(new Error('GROQ_API_KEY is not set on the server. Add it in Vercel → Project → Settings → Environment Variables.'), { status: 501 });
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: env.GROQ_MODEL || 'llama-3.1-8b-instant',
-      max_tokens: 512,
+
+  const call = async (model, extra = {}) => {
+    const payload = {
+      model,
+      max_tokens: 2048,                       // reasoning models eat budget silently
       temperature: 0.7,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages]
-    })
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.choices?.[0]?.message?.content?.trim() || '';
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      ...(isReasoningModel(model) ? { reasoning_effort: 'low' } : {}),
+      ...extra
+    };
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.error) {
+      const e = new Error(data.error.message);
+      e.status = res.status;
+      throw e;
+    }
+    return data.choices?.[0]?.message?.content?.trim() || '';
+  };
+
+  const tryWithEmptyFix = async model => {
+    const c = await call(model);
+    if (c) return c;
+    // empty content = reasoning burn → retry cheap & explicit
+    const c2 = await call(model, { reasoning_effort: 'low' });
+    if (c2) return c2;
+    throw Object.assign(new Error(`Model ${model} returned empty content`), { status: 502 });
+  };
+
+  const first = env.GROQ_MODEL || cachedModel || MODEL_PREFS[0];
+  try {
+    const out = await tryWithEmptyFix(first);
+    cachedModel = first;
+    return out;
+  } catch (e) {
+    if (!isModelError(e)) throw e;            // auth / billing / rate-limit → surface as-is
+    // model is gone → ask Groq what actually exists today, then retry once
+    let ids = [];
+    try { ids = await groqListModels(key); } catch (_) {}
+    const next = ids.length ? pickModel(ids) : MODEL_PREFS.find(m => m !== first) || first;
+    const out = await tryWithEmptyFix(next);
+    cachedModel = next;
+    return out;
+  }
 }
 
 export async function runAI(body = {}, env = {}) {
   const { action } = body;
+  const key = env.GROQ_API_KEY || env.GROQ_KEY;
+
+  /* ── diagnostics: POST /api/ai {"action":"ping"} ── */
+  if (action === 'ping') {
+    if (!key) throw Object.assign(new Error('GROQ_API_KEY is not set on the server.'), { status: 501 });
+    let ids = [];
+    try { ids = await groqListModels(key); }
+    catch (e) { return { ok: false, error: e.message }; }
+    const model = env.GROQ_MODEL || cachedModel || pickModel(ids);
+    try {
+      const reply = await askGroq(env, [{ role: 'user', content: 'Reply with exactly one word: ok' }],
+        'You are a diagnostics endpoint. Answer with exactly one word.');
+      return { ok: true, model, availableModels: ids, test: { ok: true, reply } };
+    } catch (e) {
+      return { ok: false, model, availableModels: ids, test: { ok: false, error: e.message } };
+    }
+  }
 
   if (action === 'assistant') {
     const history = Array.isArray(body.history) ? body.history.slice(-12) : [];

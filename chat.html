@@ -83,7 +83,7 @@
 
       <div id="keybar">
         <span style="display:flex;color:var(--gold)" id="keybar-ic"></span>
-        <span style="flex:1">Syncing encryption keys — waiting for a member who holds this room's key.</span>
+        <span style="flex:1" id="keybar-txt">Syncing encryption keys — waiting for a member who holds this room's key.</span>
         <button class="btn-ghost" onclick="rekeyRetry()">Retry</button>
         <button class="btn-ghost" onclick="rekeyRoom(document.getElementById('keybar').dataset.gid)">New epoch</button>
       </div>
@@ -133,7 +133,7 @@
   </aside>
 </div>
 
-<button id="sb-open-float" onclick="toggleSidebar()" title="Open chats panel"></button>
+<button id="sb-open-float" onclick="toggleSidebar()" title="Slide chats panel back" aria-label="Open chats panel"></button>
 <div id="sb-backdrop" onclick="closeMobileSidebar();document.getElementById('app').classList.remove('rp-open');this.style.display='none'"></div>
 
 <div id="lightbox" onclick="closeLightbox()"><img id="lb-img" alt="attachment"></div>
@@ -150,7 +150,7 @@
   put('keybar-ic','key',16); put('jump-btn','jump',18);
   put('rb-ic','reply',13); put('rb-x','x',18);
   put('attach-btn','image',20); put('emoji-btn','smile',20);
-  put('send-btn','send',17); put('sb-open-float','panel-left',18);
+  put('send-btn','send',17); put('sb-open-float','chev-right',18);
   put('empty-explore-ic','search',12);
   document.getElementById('empty-explore').innerHTML = icon('search','',13) + ' Explore';
   document.getElementById('empty-group').innerHTML  = icon('plus','',13) + ' Create Group';

@@ -547,7 +547,13 @@ window.clearSearch = function () { $('search-inp').value = ''; $('sc-clear').sty
 // ─── E2EE ROOM KEY SETUP ──────────────────────────────
 async function setupRoomKey(gid, members) {
   const keyRef = doc(db, 'groups', gid, 'keys', ME.uid);
-  const kd = await getDoc(keyRef);
+  let kd;
+  try { kd = await getDoc(keyRef); }
+  catch (e) {
+    // usually means firestore.rules wasn't updated (keys subcollection denied)
+    console.warn('keys subcollection unreadable — Firestore rules not updated?', e);
+    return { ok: false, rulesErr: true };
+  }
   if (kd.exists()) {
     const raw = await unwrapKey(kd.data(), ME.uid);
     const st = readRoomStore(gid);
@@ -689,13 +695,18 @@ window.openChat = async function (cid, type, data) {
       updateDoc(doc(db, 'groups', cid), { members: arrayUnion(ME.uid) }).catch(() => {});
       data.members = [...(data.members || []), ME.uid];
     }
-    const res = await setupRoomKey(cid, data.members || []);
+    let res;
+    try { res = await setupRoomKey(cid, data.members || []); }
+    catch (e) { console.warn('key sync failed:', e); res = { ok: false, rulesErr: true }; }
     if (res.ok) {
       ACTIVE = { mode: 'room', epoch: res.epoch, key: await currentRoomKey(cid) };
       shareRoomKeys(cid, data.members || []);
     } else {
       $('keybar').style.display = 'flex';
       $('keybar').dataset.gid = cid;
+      $('keybar-txt').textContent = res.rulesErr
+        ? 'Encryption keys unreachable — paste firestore.rules into the Firebase console (Rules tab), then press Retry.'
+        : "Syncing encryption keys — waiting for a member who holds this room's key.";
     }
   }
 
@@ -706,6 +717,29 @@ window.openChat = async function (cid, type, data) {
 window.rekeyRetry = function () {
   const gid = $('keybar').dataset.gid;
   if (gid && CDATA) openChat(gid, 'group', CDATA);
+};
+
+/** "Unlock" button on locked bubbles: re-fetch our wrapped room key and re-render */
+window.retryUnlock = async function () {
+  if (CTYPE !== 'group' || !CID) return;
+  toast('Fetching room key…');
+  let res;
+  try { res = await setupRoomKey(CID, CDATA?.members || []); }
+  catch (e) { res = { ok: false }; }
+  if (res.ok) {
+    ACTIVE = { mode: 'room', epoch: res.epoch, key: await currentRoomKey(CID) };
+    $('keybar').style.display = 'none';
+    decrypted = {};
+    $('msgs').innerHTML = '';
+    lastMsgDate = ''; lastMsgSender = ''; msgCount = 0;
+    detachMsgListeners();
+    attachMsgListeners(CID);
+    attachTypingListener(CID);
+    shareRoomKeys(CID, CDATA?.members || []);
+    toast('Unlocked', 'ok');
+  } else {
+    toast('Key still unavailable — a member must open the room, or start a new epoch', 'err');
+  }
 };
 
 function watchDmPresence(uid) {
@@ -800,10 +834,10 @@ async function appendMsg(msg) {
       }
       if (!payload) locked = true;
     }
-  } else {
-    payload = { t: msg.text || '', plain: true };
-    decrypted[msg._key] = payload;
-  }
+    } else {
+      payload = { t: msg.text || '', i: msg.i || undefined, plain: true };
+      decrypted[msg._key] = payload;
+    }
 
   // reply quote (new encrypted format, plus legacy v1 plaintext quotes)
   const r = payload?.r || (msg.replyTo ? { k: msg.replyTo.msgId, s: msg.replyTo.senderName, legacy: msg.replyTo.text } : null);
@@ -819,6 +853,10 @@ async function appendMsg(msg) {
   if (locked) {
     b.classList.add('locked');
     b.innerHTML = icon('lock', '', 13) + ' <span>Encrypted — key not available on this device</span>';
+    const ub = mk('button'); ub.className = 'mac unlock-btn'; ub.title = 'Try to fetch the key again';
+    ub.innerHTML = icon('refresh', '', 13);
+    ub.onclick = ev => { ev.stopPropagation(); retryUnlock(); };
+    b.appendChild(ub);
   } else {
     if (payload.t) {
       const p = mk('div'); p.className = 'msg-text';
@@ -1039,15 +1077,17 @@ window.sendMsg = async function () {
       senderAvatar: MY.avatar || 'dragon', senderPhoto: MY.photoURL || '',
       timestamp: Date.now(), reactions: null
     });
+    decrypted[pushResult.key] = payload;   // own messages always render, even pre-listener
     if (CTYPE === 'group') moderateMessage(CID, pushResult.key, ME.uid, MY.username || 'Unknown', text).catch(() => {});
     try {
       const col = CTYPE === 'dm' ? 'chats' : 'groups';
       await updateDoc(doc(db, col, CID), { lastMessage: imgs.length && !text ? 'Photo' : 'Encrypted message', lastTime: serverTimestamp() });
     } catch (_) {}
   } else {
-    // legacy plaintext fallback (peer has no E2EE keys yet)
+    // legacy plaintext fallback (peer has no E2EE keys yet) — images included
     const msg = {
-      text, senderId: ME.uid, senderName: MY.username || 'Unknown',
+      text, i: imgs.length ? imgs : undefined,
+      senderId: ME.uid, senderName: MY.username || 'Unknown',
       senderAvatar: MY.avatar || 'dragon', senderPhoto: MY.photoURL || '',
       timestamp: Date.now(), reactions: null
     };

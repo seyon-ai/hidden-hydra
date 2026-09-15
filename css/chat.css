@@ -87,15 +87,17 @@
 }
 .fab:hover { transform:scale(1.1); box-shadow:0 6px 28px rgba(201,168,76,.5); }
 
-/* floating reopen button when sidebar collapsed (desktop) */
+/* slide-back handle — visible whenever the left panel is away (desktop collapsed OR mobile closed) */
 #sb-open-float {
-  display:none; position:fixed; left:14px; bottom:14px; z-index:150;
-  width:44px; height:44px; border-radius:50%;
-  background:var(--s2); border:1px solid var(--gold3); color:var(--gold);
+  display:none; position:fixed; left:0; top:50%; transform:translateY(-50%);
+  z-index:150; width:26px; height:72px;
+  border-radius:0 12px 12px 0; background:var(--s2);
+  border:1px solid var(--gold3); border-left:none; color:var(--gold);
   cursor:pointer; align-items:center; justify-content:center;
-  box-shadow:0 6px 24px rgba(0,0,0,.5);
+  box-shadow:0 6px 24px rgba(0,0,0,.5); transition:width .2s, color .2s;
 }
-#app.sb-hidden #sb-open-float { display:flex; }
+#sb-open-float:hover { width:34px; color:var(--gold2); }
+#app.sb-hidden ~ #sb-open-float { display:flex; }
 
 /* ── MAIN ── */
 .chat-main {
@@ -170,7 +172,9 @@
 .bubble:hover .msg-actions, .bubble:focus-within .msg-actions { opacity:1; pointer-events:all; }
 .msg-row:not(.mine) .bubble { background:var(--s2); border:1px solid var(--border); border-bottom-left-radius:3px; color:var(--text); }
 .msg-row.mine .bubble      { background:linear-gradient(135deg,#2C2215,#1E1A0C); border:1px solid var(--gold3); border-bottom-right-radius:3px; color:var(--gold2); }
-.bubble.locked { opacity:.75; font-size:12px; display:flex; align-items:center; gap:7px; color:var(--dim); }
+.bubble.locked { opacity:.85; font-size:12px; display:flex; align-items:center; gap:7px; color:var(--dim); }
+.unlock-btn { color:var(--gold); margin-left:4px; }
+.unlock-btn:hover { color:var(--gold2); transform:scale(1.15); }
 .msg-text a { color:var(--gold); text-decoration:underline; text-underline-offset:2px; }
 
 .msg-imgs { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
@@ -348,6 +352,8 @@
   .sidebar { position:fixed; left:0; top:0; bottom:0; z-index:200; transform:translateX(-100%); width:85vw; max-width:300px; border-right:1px solid var(--border); }
   #app.sb-open .sidebar { transform:translateX(0); }
   #app.sb-hidden .sidebar { width:85vw; }      /* collapse is desktop-only */
+  #app:not(.sb-open) ~ #sb-open-float { display:flex; }   /* mobile: handle whenever drawer is closed */
+  #sb-open-float { height:56px; }
   .back-btn { display:flex !important; }
   .msgs { padding:12px 10px; }
   .msg-content { max-width:82%; }

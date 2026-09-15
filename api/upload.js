@@ -7,7 +7,7 @@
  */
 
 export async function runUpload(body = {}, env = {}) {
-  const key = env.IMGBB_API_KEY;
+  const key = env.IMGBB_API_KEY || env.IMGBB_KEY;   // tolerate common alias
   if (!key) throw Object.assign(new Error('IMGBB_API_KEY is not set on the server. Add it in Vercel → Project → Settings → Environment Variables.'), { status: 501 });
 
   const b64 = String(body.image || '');

@@ -130,7 +130,20 @@ PWA manifest (installable) · OG social card · themed 404 · dev server.
 
 ---
 
-## 3 · Notes & honest limits
+## 3 · Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| AI / uploads fail on Vercel | `GET /api/health` → shows if the server sees each key. If `false`: **redeploy** (env vars only apply to new deployments) and check the environment checkboxes (Production/Preview/Development). |
+| Health says `true` but AI fails | Groq retired `llama-3.1-8b-instant` (16 Aug 2026). This build auto-falls-back to live models; diagnose with `POST /api/ai {"action":"ping"}` → returns your available models + a live test reply. |
+| Health says `true` but calls fail | Key invalid/revoked → rotate. (Your old Groq key was in the public repo — rotate it regardless.) |
+| "Encryption keys unreachable" banner | Paste `firestore.rules` into Firebase → Firestore → Rules (the `groups/{gid}/keys/{uid}` block is required). |
+| Locked bubble ("key not available on this device") | Press its ⟳ button to refetch; or a member with the key opens the room; or Group info → New epoch. |
+| Left panel won't come back | Gold slide-back handle at the left screen edge (also on mobile whenever the drawer is closed). |
+
+---
+
+## 4 · Notes & honest limits
 - Group key sync needs *some* key-holder online; otherwise the room offers a
   new epoch. World rooms cap the member array at 2,000 for wrapping.
 - Clearing browser data discards your private key (that's the point of E2EE).

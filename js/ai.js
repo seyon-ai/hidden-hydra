@@ -72,8 +72,10 @@ export async function handleAIChat(userUid, username, userMessage) {
       return reply;
     }
   } catch (e) {
+    const why = String(e.message || '').slice(0, 200);
     await botMsg(AI_ROOM(userUid),
-      'The AI core is unreachable right now. Make sure GROQ_API_KEY is set in your Vercel project environment variables, then try again.');
+      'Hydra AI could not answer right now. Server says: ' + why +
+      ' — check GROQ_API_KEY on Vercel (and redeploy after changing env vars), or POST /api/ai {"action":"ping"} to diagnose.');
   }
   return null;
 }
@@ -148,7 +150,7 @@ export async function parseCommand(userUid, username, chatId, text, sendMsgFn) {
         try {
           const reply = await aiChat([{ role: 'user', content: args }], username);
           if (reply) await botMsg(chatId, reply);
-        } catch (_) { await botMsg(chatId, 'The AI core is unreachable right now (see README: set GROQ_API_KEY on Vercel).'); }
+        } catch (e) { await botMsg(chatId, 'Hydra AI error: ' + String(e.message || 'unreachable').slice(0, 180)); }
       }, 400);
       return true;
 

@@ -54,6 +54,18 @@ const server = http.createServer(async (req, res) => {
   let p = decodeURIComponent(url.pathname);
 
   /* API emulation */
+  if (p === '/api/health' || p === '/api/health.js') {
+    return json(res, 200, {
+      ok: true, service: 'hidden-hydra-api (local dev)', node: process.version,
+      now: new Date().toISOString(),
+      env: {
+        GROQ_API_KEY: !!env.GROQ_API_KEY || !!env.GROQ_KEY,
+        IMGBB_API_KEY: !!env.IMGBB_API_KEY || !!env.IMGBB_KEY,
+        GROQ_MODEL: env.GROQ_MODEL || 'llama-3.1-8b-instant (default)',
+        APP_ORIGIN: env.APP_ORIGIN ? 'set' : 'unset (open)'
+      }
+    });
+  }
   if (p === '/api/ai' || p === '/api/ai.js') {
     if (req.method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }); return res.end(); }
     try { return json(res, 200, await runAI(await readBody(req), env)); }

@@ -54,6 +54,7 @@ const SPRITE =
   S('book',    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>') +
   S('chev-down','<path d="M6 9l6 6 6-6"/>') +
   S('chev-left','<path d="M15 18l-6-6 6-6"/>') +
+  S('chev-right','<path d="M9 18l6-6-6-6"/>') +
   S('download','<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>') +
   S('jump',    '<path d="M12 5v13"/><path d="M6 12l6 6 6-6"/>') +
 
