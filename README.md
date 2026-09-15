@@ -94,6 +94,13 @@ node dev-server.mjs      # → http://localhost:3000 (static + /api emulation)
   the URL is embedded **inside the encrypted payload**.
 - Thumbnail grid in bubbles + full-screen lightbox. Profile photos use the same pipeline.
 
+### 🔔 Notifications
+Bell icon (top-left) → browser permission. Alerts for friend requests, accepted
+requests, DMs and group/world messages: OS notification + chime when the tab is
+backgrounded, in-app toast when foregrounded; gold badge = pending requests.
+Click again to pause. (Works while the site is open in any tab; fully-closed-tab
+push would need Firebase Cloud Messaging — see `help.html`.)
+
 ### 🔒 End-to-end encryption (item 6)
 See `security.html` (in-site) for the user-facing explainer.
 - Identity: per-browser **ECDH P-256** pair; private key never leaves the device;

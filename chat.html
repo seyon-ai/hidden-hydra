@@ -30,6 +30,7 @@
           <div class="me-name" id="me-name">—</div>
           <div class="me-status"><span class="pulse"></span>Online</div>
         </div>
+        <button class="ib" title="Notifications" onclick="event.stopPropagation();toggleNotif()" id="btn-bell" style="position:relative"></button>
         <button class="ib" title="Profile"  onclick="event.stopPropagation();goProfile()" id="btn-profile"></button>
         <button class="ib" title="Sign out" onclick="event.stopPropagation();doLogout()" id="btn-logout"></button>
         <button class="ib" title="Collapse panel" onclick="event.stopPropagation();toggleSidebar()" id="btn-sb"></button>
@@ -143,7 +144,7 @@
   import { icon } from './js/icons.js';
   // stamp static icons
   const put = (id, name, size) => { const el = document.getElementById(id); if (el) el.innerHTML = icon(name, '', size || 18); };
-  put('btn-profile','user',17); put('btn-logout','logout',17); put('btn-sb','panel-left',17);
+  put('btn-bell','bell',17); put('btn-profile','user',17); put('btn-logout','logout',17); put('btn-sb','panel-left',17);
   put('sb-search-ic','search',15);
   put('menu-btn','menu',20); put('back-btn','back',20);
   put('ch-lock','lock',13); put('info-btn','info',17); put('rp-btn','panel-right',17);

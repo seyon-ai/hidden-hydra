@@ -55,6 +55,13 @@
   background:var(--danger); color:#fff; font-size:8px; font-weight:700;
   display:none; align-items:center; justify-content:center; padding:0 3px;
 }
+.ib .nbadge {
+  position:absolute; top:-4px; right:-5px;
+  min-width:15px; height:15px; border-radius:8px;
+  background:var(--gold); color:#14120a; font-size:8.5px; font-weight:800;
+  display:none; align-items:center; justify-content:center; padding:0 3px;
+  box-shadow:0 0 0 2px var(--s1);
+}
 
 .sb-search { display:flex; align-items:center; gap:8px; padding:9px 12px; border-top:1px solid var(--border); color:var(--dim); }
 .sb-search input {

@@ -197,6 +197,7 @@ onAuthStateChanged(auth, async user => {
 
   await seedWorldRooms();
   await refreshFriends();
+  startNotifWatchers();
   if (!MY.welcomed) setTimeout(() => welcomeNewUser(ME, MY), 2000);
   boot();
 });
@@ -1245,6 +1246,147 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// ─── NOTIFICATIONS ────────────────────────────────────
+// Bell + Web Notifications: friend requests, accepted requests, DMs and group
+// messages. Background tab → OS notification + soft chime; foreground → toast.
+let notifFirstReq = true, notifFirstAcc = true, notifFirstChat = true, notifFirstGrp = true;
+const nameCache = {};
+async function userName(uid) {
+  if (!uid) return 'Someone';
+  if (nameCache[uid]) return nameCache[uid];
+  try { const u = await getDoc(doc(db, 'users', uid)); nameCache[uid] = u.data()?.username || 'Someone'; }
+  catch (_) { nameCache[uid] = 'Someone'; }
+  return nameCache[uid];
+}
+function chime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
+    chime.ctx = chime.ctx || new Ctx();
+    const t = chime.ctx.currentTime;
+    const o = chime.ctx.createOscillator(), g = chime.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(988, t); o.frequency.setValueAtTime(1319, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.06, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    o.connect(g); g.connect(chime.ctx.destination);
+    o.start(t); o.stop(t + 0.55);
+  } catch (_) {}
+}
+function notify(title, body, go) {
+  if (localStorage.getItem('hh_notif') === '0') return;               // paused by user
+  if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+    try {
+      const n = new Notification(title, {
+        body: body || '',
+        icon: new URL('assets/logo-64.png?v=260915b', location.href).href,
+        badge: new URL('assets/logo-32.png?v=260915b', location.href).href
+      });
+      n.onclick = () => { window.focus(); try { go && go(); } catch (_) {} n.close(); };
+    } catch (_) {}
+    chime();
+  } else if (!document.hidden) {
+    toast(body ? `${title} — ${body}` : title);
+  }
+}
+window.toggleNotif = async function () {
+  if (!('Notification' in window)) { toast('This browser does not support notifications', 'err'); return; }
+  if (Notification.permission === 'granted') {
+    const on = localStorage.getItem('hh_notif') === '1';
+    localStorage.setItem('hh_notif', on ? '0' : '1');
+    toast(on ? 'Notifications paused' : 'Notifications on');
+    updateBell(); return;
+  }
+  const p = await Notification.requestPermission();
+  if (p === 'granted') { localStorage.setItem('hh_notif', '1'); toast('Notifications on — requests, DMs and group messages will alert you', 'ok'); }
+  else toast('Notification permission not granted', 'err');
+  updateBell();
+};
+function updateBell() {
+  const b = $('btn-bell'); if (!b) return;
+  let badge = b.querySelector('.nbadge');
+  if (!badge) { badge = document.createElement('span'); badge.className = 'nbadge'; b.appendChild(badge); }
+  const n = Number(badge.dataset.n || 0);
+  const on = localStorage.getItem('hh_notif') === '1';
+  b.style.color = on ? 'var(--gold)' : '';
+  badge.style.display = n > 0 ? 'flex' : 'none';
+  badge.textContent = n > 9 ? '9+' : String(n);
+  b.title = on ? 'Notifications on — click to pause' : 'Notifications off — click to enable';
+}
+function setBellCount(n) {
+  const b = $('btn-bell'); if (!b) return;
+  let badge = b.querySelector('.nbadge');
+  if (!badge) { badge = document.createElement('span'); badge.className = 'nbadge'; b.appendChild(badge); }
+  badge.dataset.n = String(n);
+  updateBell();
+}
+function goTab(name) { switchTab(name, document.querySelector(`[data-tab="${name}"]`)); }
+
+function startNotifWatchers() {
+  if (!ME) return;
+  if (localStorage.getItem('hh_notif') == null && 'Notification' in window && Notification.permission === 'granted') {
+    localStorage.setItem('hh_notif', '1');
+  }
+  updateBell();
+  if ('Notification' in window && Notification.permission === 'default' && localStorage.getItem('hh_notif') == null) {
+    setTimeout(() => toast('Tip: click the bell icon (top-left) to get notifications for requests & messages'), 2500);
+  }
+
+  // incoming friend requests → badge + notification for NEW ones
+  onSnapshot(query(collection(db, 'friendRequests'), where('to', '==', ME.uid), where('status', '==', 'pending')), snap => {
+    setBellCount(snap.size);
+    const rb = $('req-badge'); if (rb) { rb.style.display = snap.size ? 'flex' : 'none'; rb.textContent = snap.size; }
+    if (notifFirstReq) { notifFirstReq = false; return; }
+    snap.docChanges().forEach(c => {
+      if (c.type !== 'added') return;
+      const d = c.doc.data();
+      notify('Friend request', `${d.fromName || 'Someone'} wants to connect with you`, () => goTab('req'));
+    });
+  });
+
+  // my outgoing requests got accepted
+  onSnapshot(query(collection(db, 'friendRequests'), where('from', '==', ME.uid), where('status', '==', 'accepted')), snap => {
+    if (notifFirstAcc) { notifFirstAcc = false; return; }
+    snap.docChanges().forEach(c => {
+      if (c.type !== 'added' && c.type !== 'modified') return;
+      const d = c.doc.data();
+      notify('Request accepted', `${d.toName || 'They'} accepted your friend request`, () => goTab('dms'));
+    });
+  });
+
+  // DM activity (lastMessage updates on the chat doc)
+  onSnapshot(query(collection(db, 'chats'), where('members', 'array-contains', ME.uid)), snap => {
+    if (notifFirstChat) { notifFirstChat = false; return; }
+    snap.docChanges().forEach(async c => {
+      if (c.type !== 'modified') return;
+      const d = c.doc.data(); if (d.type !== 'dm') return;
+      if (d.lastSenderId === ME.uid) return;
+      if (CID === c.doc.id && document.hasFocus()) return;
+      const oid = (d.members || []).find(m => m !== ME.uid);
+      const name = await userName(oid);
+      const body = (d.lastMessage === 'Encrypted message' || d.lastMessage === 'Photo')
+        ? `Sent you a ${String(d.lastMessage).toLowerCase()}`
+        : (d.lastMessage || 'New message');
+      notify(`New message from ${name}`, body, () => startDM(oid));
+    });
+  });
+
+  // group activity (private + world rooms)
+  onSnapshot(query(collection(db, 'groups'), where('members', 'array-contains', ME.uid)), snap => {
+    if (notifFirstGrp) { notifFirstGrp = false; return; }
+    snap.docChanges().forEach(c => {
+      if (c.type !== 'modified') return;
+      const d = c.doc.data();
+      if (d.lastSenderId === ME.uid) return;
+      if (CID === c.doc.id && document.hasFocus()) return;
+      const body = (d.lastMessage === 'Encrypted message' || d.lastMessage === 'Photo')
+        ? `New ${String(d.lastMessage).toLowerCase()}`
+        : `${d.lastSenderName || 'Someone'}: ${d.lastMessage || ''}`.slice(0, 90);
+      notify(`New message in ${d.name || 'group'}`, body, () => openChat(c.doc.id, 'group', { id: c.doc.id, ...d }));
+    });
+  });
+}
+
 // ─── SEND MESSAGE ─────────────────────────────────────
 window.sendMsg = async function () {
   const ta = $('msg-ta'); if (!ta) return;
@@ -1326,7 +1468,7 @@ window.sendMsg = async function () {
       if (CTYPE === 'group') moderateMessage(CID, pushResult.key, ME.uid, MY.username || 'Unknown', text).catch(() => {});
       try {
         const col = CTYPE === 'dm' ? 'chats' : 'groups';
-        await updateDoc(doc(db, col, CID), { lastMessage: imgs.length && !text ? 'Photo' : 'Encrypted message', lastTime: serverTimestamp() });
+        await updateDoc(doc(db, col, CID), { lastMessage: imgs.length && !text ? 'Photo' : 'Encrypted message', lastTime: serverTimestamp(), lastSenderId: ME.uid, lastSenderName: MY.username || '' });
       } catch (_) {}
     } catch (e) {
       console.error('send failed:', e);
@@ -1347,7 +1489,7 @@ window.sendMsg = async function () {
     if (CTYPE === 'group') moderateMessage(CID, pr.key, ME.uid, MY.username || 'Unknown', text).catch(() => {});
     try {
       const col = CTYPE === 'dm' ? 'chats' : 'groups';
-      await updateDoc(doc(db, col, CID), { lastMessage: text, lastTime: serverTimestamp() });
+      await updateDoc(doc(db, col, CID), { lastMessage: text, lastTime: serverTimestamp(), lastSenderId: ME.uid, lastSenderName: MY.username || '' });
     } catch (_) {}
   }
 
