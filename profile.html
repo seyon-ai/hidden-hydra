@@ -155,7 +155,7 @@ async function loadKeyBox(){
     const pub=await ensureKeyPair(ME.uid);
     const fp=await fingerprint(pub||MY.publicKey);
     document.getElementById('key-box').innerHTML=
-      icon('lock','',13)+' <b style="color:var(--online)">Your messages are end-to-end encrypted.</b><br>'+
+      icon('lock','',13)+' <b style="color:var(--online)">Your DMs & private groups are end-to-end encrypted.</b><br>'+
       'Your private key never leaves this browser. Public key fingerprint:<br>'+
       '<span class="fp">'+fp+'</span><br>'+
       '<a href="security.html">How Hidden Hydra encryption works →</a>';
