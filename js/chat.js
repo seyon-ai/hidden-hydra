@@ -66,6 +66,15 @@ let dmUnsub = null, grpUnsub = null, selfUnsub = null, dmPresenceUnsub = null;
 
 let lastMsgDate = '', lastMsgSender = '', msgCount = 0;
 let lastDmUpgrade = 0;
+let convTimer = null;
+
+// surface silent failures instead of "nothing happens"
+window.addEventListener('unhandledrejection', ev => {
+  console.error('[HH] unhandled rejection:', ev.reason);
+});
+window.addEventListener('error', ev => {
+  console.error('[HH] window error:', ev.message);
+});
 
 // ─── UTILS ────────────────────────────────────────────
 const $   = id => document.getElementById(id);
@@ -328,15 +337,17 @@ function loadDMs() {
     if (!items.length) { cl.innerHTML = '<div class="empty-lm">No conversations yet.<br>Send a friend request to start.</div>'; return; }
     cl.appendChild(mkLbl('DIRECT MESSAGES · E2E ENCRYPTED'));
     items.forEach(item => {
-      const r = mkCiRow();
-      r.querySelector('.ci-av').appendChild(avEl(item.other, 42));
-      r.querySelector('.ci-name').textContent = item.other.username || '—';
-      r.querySelector('.ci-prev').innerHTML = prevLabel(item.lastMessage, true);
-      const lt = item.lastTime?.toMillis?.() || 0;
-      if (lt > seenTs(item.id)) r.querySelector('.unread-dot').style.display = 'block';
-      if (CID === item.id) r.classList.add('active');
-      r.onclick = () => openChat(item.id, 'dm', item.other);
-      cl.appendChild(r);
+      try {
+        const r = mkCiRow();
+        r.querySelector('.ci-av').appendChild(avEl(item.other, 42));
+        r.querySelector('.ci-name').textContent = item.other.username || '—';
+        r.querySelector('.ci-prev').innerHTML = prevLabel(item.lastMessage, true);
+        const lt = item.lastTime?.toMillis?.() || 0;
+        if (lt > seenTs(item.id)) r.querySelector('.unread-dot').style.display = 'block';
+        if (CID === item.id) r.classList.add('active');
+        r.onclick = () => openChat(item.id, 'dm', item.other);
+        cl.appendChild(r);
+      } catch (e) { console.error('dm row render failed:', e); }
     });
   });
 }
@@ -665,15 +676,35 @@ async function shareRoomKeys(gid, members) {
 /** start a fresh encryption epoch (rescues rooms where key sync is stuck) */
 window.rekeyRoom = async function (gid) {
   const st = readRoomStore(gid);
-  const epoch = (st.current || 0) + 1;
+  // NEVER reuse an epoch that already exists anywhere (doc, group field, session) —
+  // re-minting an existing epoch splits the room (sender new key, peers old key).
+  let docEpoch = 0;
+  try {
+    const gd = await getDoc(doc(db, 'groups', gid));
+    docEpoch = gd.data()?.e2eeEpoch || 0;
+  } catch (_) {}
+  const epoch = Math.max(st.current || 0, docEpoch, ACTIVE.epoch || 0, 0) + 1;
   const raw = newRoomKeyRaw();
   st.epochs[epoch] = raw; st.current = epoch; writeRoomStore(gid, st);
   await publishMyKey(gid, raw, epoch);
   updateDoc(doc(db, 'groups', gid), { e2eeEpoch: epoch }).catch(() => {});
-  const g = await getDoc(doc(db, 'groups', gid));
-  await shareRoomKeys(gid, g.data()?.members || []);
-  toast('New encryption epoch started', 'ok');
-  if (CID === gid) openChat(gid, 'group', { id: gid, ...(g.data() || {}) });
+  let g = null;
+  try { g = await getDoc(doc(db, 'groups', gid)); } catch (_) {}
+  const members = g?.data()?.members || CDATA?.members || [];
+  if (CID === gid) CDATA = { id: gid, ...(g?.data() || CDATA || {}) };
+  await shareRoomKeys(gid, members);
+  if (CID === gid) {
+    ACTIVE = { mode: 'room', epoch, key: await currentRoomKey(gid) };
+    $('keybar').style.display = 'none';
+    decrypted = {};
+    $('msgs').innerHTML = '';
+    lastMsgDate = ''; lastMsgSender = ''; msgCount = 0;
+    detachMsgListeners();
+    attachMsgListeners(gid);
+    attachTypingListener(gid);
+    $('ch-sub').innerHTML = `${members.length} members · ${icon('lock', '', 10)} E2EE · epoch ${epoch}`;
+  }
+  toast(`Epoch ${epoch} started — new messages now work on every device. Older locked messages stay locked (their key is gone).`, 'ok');
 };
 
 // ─── OPEN CHAT ────────────────────────────────────────
@@ -693,6 +724,7 @@ window.openChat = async function (cid, type, data) {
   markSeen(cid);
 
   const isGrp = type === 'group', isAI = type === 'ai';
+  try {
   $('ch-name').textContent = isGrp ? data.name : isAI ? 'Hydra AI' : (data.username || '—');
   const chAv = $('ch-av'); chAv.innerHTML = '';
   if (isGrp) chAv.appendChild(roomIconEl(data, 20));
@@ -708,7 +740,7 @@ window.openChat = async function (cid, type, data) {
 
   if (type === 'dm') {
     $('ch-sub').textContent = 'checking status…';
-    watchDmPresence(data.uid);
+    watchDmPresence(data?.uid);
   } else if (isAI) {
     $('ch-sub').textContent = 'Private assistant · not E2EE';
     if (dmPresenceUnsub) { dmPresenceUnsub(); dmPresenceUnsub = null; }
@@ -755,18 +787,52 @@ window.openChat = async function (cid, type, data) {
     let res;
     try { res = await setupRoomKey(cid, data.members || []); }
     catch (e) { console.warn('key sync failed:', e); res = { ok: false, rulesErr: true }; }
-    if (res.ok) {
-      ACTIVE = { mode: 'room', epoch: res.epoch, key: await currentRoomKey(cid) };
+    const rk = res.ok ? await currentRoomKey(cid) : null;
+    if (res.ok && rk) {
+      ACTIVE = { mode: 'room', epoch: res.epoch, key: rk };
       shareRoomKeys(cid, data.members || []);
+      // background convergence: keep merge-writing missing wraps while we're here
+      if (convTimer) clearInterval(convTimer);
+      convTimer = setInterval(() => {
+        if (CID === cid && CTYPE === 'group') shareRoomKeys(cid, CDATA?.members || []).catch(() => {});
+      }, 60000);
     } else {
+      if (res.ok && !rk) console.warn('room key setup ok but no local raw — treating as pending');
       $('keybar').style.display = 'flex';
       $('keybar').dataset.gid = cid;
       $('keybar-txt').textContent = res.rulesErr
         ? 'Encryption keys unreachable — paste firestore.rules into the Firebase console (Rules tab), then press Retry.'
         : "Syncing keys — a member who holds this room's key must open the room. If you reset this browser or switched devices, older messages stay locked; press New epoch to keep chatting.";
+      if (!res.rulesErr) {
+        // silent watcher: the instant a wrap we CAN unwrap lands, drop into decrypted mode
+        keyUnsub = onSnapshot(doc(db, 'groups', cid, 'keys', ME.uid), async snap => {
+          if (!snap.exists() || CID !== cid || ACTIVE.mode === 'room') return;
+          const d = snap.data();
+          const wraps = d.wraps || (d.epk ? { [d.epoch || 1]: { epk: d.epk, ct: d.ct } } : {});
+          const st = readRoomStore(cid);
+          let got = false;
+          for (const [ep, rec] of Object.entries(wraps)) {
+            if (st.epochs[ep]) continue;
+            try { st.epochs[ep] = await unwrapKey(rec, ME.uid); st.current = Number(ep); got = true; } catch (_) {}
+          }
+          if (got) {
+            writeRoomStore(cid, st);
+            if (keyUnsub) { keyUnsub(); keyUnsub = null; }
+            toast("Room key received — you're in", 'ok');
+            openChat(cid, 'group', CDATA);
+          }
+        }, () => {});
+      }
     }
   }
 
+  } catch (e) {
+    // NEVER leave the user with a dead chat: open anyway, degrade gracefully
+    console.error('openChat setup failed:', e);
+    toast('Chat opened with limited setup: ' + (e.message || e), 'err');
+    if (type === 'dm') ACTIVE = { mode: 'legacy', epoch: 0 };
+    else if (isGrp) { $('keybar').style.display = 'flex'; $('keybar').dataset.gid = cid; }
+  }
   attachMsgListeners(cid);
   attachTypingListener(cid);
   if (innerWidth <= 700) closeMobileSidebar();
@@ -832,6 +898,7 @@ window.closeCv = function () {
 
 // ─── LISTENERS ────────────────────────────────────────
 function detachMsgListeners() {
+  if (convTimer) { clearInterval(convTimer); convTimer = null; }
   if (msgAddedRef) { off(msgAddedRef); msgAddedRef = null; }
   if (msgChangedRef) { off(msgChangedRef); msgChangedRef = null; }
   if (typRef) { off(typRef); typRef = null; }
@@ -945,7 +1012,7 @@ async function appendMsg(msg) {
       note.innerHTML =
         icon('lock', '', 14) +
         `<span class="ln-txt">0 encrypted messages locked</span>` +
-        `<span class="ln-why">This device doesn't hold their key — sent from another device/epoch, or before a browser reset. E2EE means no server can recover them.</span>` +
+        `<span class="ln-why">This device doesn't hold their key — sent from another device/epoch, or before a browser reset. If BOTH sides see locked messages, press New epoch once: every device then converges on the fresh epoch and new messages flow normally.</span>` +
         `<span class="ln-btns"></span>`;
       const btns = note.querySelector('.ln-btns');
       const b1 = mk('button'); b1.className = 'btn-ghost'; b1.style.cssText = 'padding:5px 12px;font-size:9px';
@@ -1200,22 +1267,40 @@ window.sendMsg = async function () {
   }
 
   if (ACTIVE.mode === 'dm' || ACTIVE.mode === 'room') {
-    const payload = { t: text, i: imgs, r: replyTo || null };
-    const ct = await encryptPayload(ACTIVE.key, payload);
-    const pushResult = await push(ref(rtdb, `messages/${CID}`), {
-      ct,
-      e: ACTIVE.mode === 'room' ? (ACTIVE.epoch || 1) : undefined,
-      img: imgs.length ? 1 : 0,
-      senderId: ME.uid, senderName: MY.username || 'Unknown',
-      senderAvatar: MY.avatar || 'dragon', senderPhoto: MY.photoURL || '',
-      timestamp: Date.now(), reactions: null
-    });
-    decrypted[pushResult.key] = payload;   // own messages always render, even pre-listener
-    if (CTYPE === 'group') moderateMessage(CID, pushResult.key, ME.uid, MY.username || 'Unknown', text).catch(() => {});
+    // never hand a null key to WebCrypto (that silently killed the send button)
+    if (!ACTIVE.key) {
+      if (ACTIVE.mode === 'room') ACTIVE.key = await currentRoomKey(CID);
+      else if (CDATA?.otherUid) {
+        try {
+          const od = await getDoc(doc(db, 'users', CDATA.otherUid));
+          const pub2 = od.data()?.publicKey;
+          if (pub2) ACTIVE.key = await deriveDMKey(ME.uid, CDATA.otherUid, pub2);
+        } catch (_) {}
+      }
+    }
+    if (!ACTIVE.key) { toast('Encryption key not ready yet — press Retry key / open the room again', 'err'); return; }
     try {
-      const col = CTYPE === 'dm' ? 'chats' : 'groups';
-      await updateDoc(doc(db, col, CID), { lastMessage: imgs.length && !text ? 'Photo' : 'Encrypted message', lastTime: serverTimestamp() });
-    } catch (_) {}
+      const payload = { t: text, i: imgs, r: replyTo || null };
+      const ct = await encryptPayload(ACTIVE.key, payload);
+      const pushResult = await push(ref(rtdb, `messages/${CID}`), {
+        ct,
+        e: ACTIVE.mode === 'room' ? (ACTIVE.epoch || 1) : undefined,
+        img: imgs.length ? 1 : 0,
+        senderId: ME.uid, senderName: MY.username || 'Unknown',
+        senderAvatar: MY.avatar || 'dragon', senderPhoto: MY.photoURL || '',
+        timestamp: Date.now(), reactions: null
+      });
+      decrypted[pushResult.key] = payload;   // own messages always render, even pre-listener
+      if (CTYPE === 'group') moderateMessage(CID, pushResult.key, ME.uid, MY.username || 'Unknown', text).catch(() => {});
+      try {
+        const col = CTYPE === 'dm' ? 'chats' : 'groups';
+        await updateDoc(doc(db, col, CID), { lastMessage: imgs.length && !text ? 'Photo' : 'Encrypted message', lastTime: serverTimestamp() });
+      } catch (_) {}
+    } catch (e) {
+      console.error('send failed:', e);
+      toast('Send failed: ' + (e.message || e), 'err');
+      return;   // keep the typed text so nothing is lost
+    }
   } else {
     // legacy plaintext fallback (peer has no E2EE keys yet) — images included
     const msg = {
