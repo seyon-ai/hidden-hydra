@@ -5,17 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
   <title>Chat — Hidden Hydra</title>
   <meta name="theme-color" content="#05050A"/>
-  <link rel="icon" href="assets/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" href="assets/logo-32.png">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="icon" href="assets/favicon.ico?v=260915b" sizes="any">
+  <link rel="icon" type="image/png" href="assets/logo-32.png?v=260915b">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=260915b">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/global.css">
-  <link rel="stylesheet" href="css/chat.css">
+  <link rel="stylesheet" href="css/global.css?v=260915b">
+  <link rel="stylesheet" href="css/chat.css?v=260915b">
 </head>
 <body>
 
 <div id="loading" class="loading-screen">
-  <img src="assets/logo.png" alt="Hidden Hydra">
+  <img src="assets/logo.png?v=260915b" alt="Hidden Hydra">
   <div class="ring"></div>
   <div class="loading-txt">ENTERING THE HYDRA</div>
 </div>
@@ -57,7 +57,7 @@
   <main class="chat-main">
     <!-- Empty state -->
     <div class="empty-state" id="empty">
-      <img src="assets/logo.png" alt="">
+      <img src="assets/logo.png?v=260915b" alt="">
       <h2 style="font-family:'Cinzel',serif;font-size:22px;color:var(--faint);letter-spacing:6px;margin-bottom:10px">HIDDEN HYDRA</h2>
       <p style="font-size:13px;color:var(--faint);letter-spacing:1px;margin-bottom:24px">Select a chat or explore people — every message end-to-end encrypted</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
@@ -155,6 +155,6 @@
   document.getElementById('empty-explore').innerHTML = icon('search','',13) + ' Explore';
   document.getElementById('empty-group').innerHTML  = icon('plus','',13) + ' Create Group';
 </script>
-<script type="module" src="js/chat.js"></script>
+<script type="module" src="js/chat.js?v=260915b"></script>
 </body>
 </html>

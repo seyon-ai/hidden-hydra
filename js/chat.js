@@ -67,6 +67,7 @@ let dmUnsub = null, grpUnsub = null, selfUnsub = null, dmPresenceUnsub = null;
 let lastMsgDate = '', lastMsgSender = '', msgCount = 0;
 let lastDmUpgrade = 0;
 let convTimer = null;
+let renderedMids = new Set();
 
 // surface silent failures instead of "nothing happens"
 window.addEventListener('unhandledrejection', ev => {
@@ -697,6 +698,7 @@ window.rekeyRoom = async function (gid) {
     ACTIVE = { mode: 'room', epoch, key: await currentRoomKey(gid) };
     $('keybar').style.display = 'none';
     decrypted = {};
+    renderedMids = new Set();
     $('msgs').innerHTML = '';
     lastMsgDate = ''; lastMsgSender = ''; msgCount = 0;
     detachMsgListeners();
@@ -714,6 +716,7 @@ window.openChat = async function (cid, type, data) {
   lastMsgDate = ''; lastMsgSender = ''; msgCount = 0;
   pendingImages = []; renderPending();
   decrypted = {};
+  renderedMids = new Set();
   $('keybar').style.display = 'none';
 
   $('empty').style.display = 'none';
@@ -779,7 +782,8 @@ window.openChat = async function (cid, type, data) {
     }
   } else {
     // world rooms: join members list (capped) so keys can propagate
-    if (data.type === 'global' && !(data.members || []).includes(ME.uid) && (data.members || []).length < 2000) {
+    const isWorld = data.type === 'global' || WORLD.some(w => w.id === cid);
+    if (isWorld && !(data.members || []).includes(ME.uid) && (data.members || []).length < 2000) {
       updateDoc(doc(db, 'groups', cid), { members: arrayUnion(ME.uid) }).catch(() => {});
       data.members = [...(data.members || []), ME.uid];
       $('ch-sub').innerHTML = `${data.members.length} members · ${icon('lock', '', 10)} E2EE`;
@@ -866,6 +870,7 @@ window.retryUnlock = async function () {
   if (ok) {
     $('keybar').style.display = 'none';
     decrypted = {};
+    renderedMids = new Set();
     $('msgs').innerHTML = '';
     lastMsgDate = ''; lastMsgSender = ''; msgCount = 0;
     detachMsgListeners();
@@ -925,6 +930,9 @@ function attachMsgListeners(cid) {
 
 async function appendMsg(msg) {
   const wrap = $('msgs'); if (!wrap) return;
+  // de-dupe: never render the same message id twice (replays, double listeners…)
+  if (msg._key && (wrap.querySelector(`[data-mid="${msg._key}"]`) || renderedMids.has(msg._key))) return;
+  if (msg._key) renderedMids.add(msg._key);
   const ph = wrap.querySelector('[data-ph]'); if (ph) ph.remove();
 
   const d = fmtDate(msg.timestamp);
@@ -1019,7 +1027,9 @@ async function appendMsg(msg) {
       b1.innerHTML = icon('refresh', '', 11) + ' Retry key'; b1.onclick = () => retryUnlock();
       const b2 = mk('button'); b2.className = 'btn-ghost'; b2.style.cssText = 'padding:5px 12px;font-size:9px';
       b2.innerHTML = icon('key', '', 11) + ' New epoch'; b2.onclick = () => rekeyRoom(CID);
-      btns.appendChild(b1); btns.appendChild(b2);
+      const b3 = mk('button'); b3.className = 'btn-ghost'; b3.style.cssText = 'padding:5px 10px;font-size:9px';
+      b3.innerHTML = icon('x', '', 11) + ' Hide'; b3.onclick = () => note.remove();
+      btns.appendChild(b1); btns.appendChild(b2); btns.appendChild(b3);
       wrap.appendChild(note);
     }
     const n = (Number(note.dataset.count || 0) + 1);
@@ -1282,14 +1292,16 @@ window.sendMsg = async function () {
     try {
       const payload = { t: text, i: imgs, r: replyTo || null };
       const ct = await encryptPayload(ACTIVE.key, payload);
-      const pushResult = await push(ref(rtdb, `messages/${CID}`), {
+      // NB: RTDB rejects `undefined` VALUES — only set keys we actually have
+      const obj = {
         ct,
-        e: ACTIVE.mode === 'room' ? (ACTIVE.epoch || 1) : undefined,
         img: imgs.length ? 1 : 0,
         senderId: ME.uid, senderName: MY.username || 'Unknown',
         senderAvatar: MY.avatar || 'dragon', senderPhoto: MY.photoURL || '',
         timestamp: Date.now(), reactions: null
-      });
+      };
+      if (ACTIVE.mode === 'room') obj.e = ACTIVE.epoch || 1;
+      const pushResult = await push(ref(rtdb, `messages/${CID}`), obj);
       decrypted[pushResult.key] = payload;   // own messages always render, even pre-listener
       if (CTYPE === 'group') moderateMessage(CID, pushResult.key, ME.uid, MY.username || 'Unknown', text).catch(() => {});
       try {
@@ -1304,11 +1316,12 @@ window.sendMsg = async function () {
   } else {
     // legacy plaintext fallback (peer has no E2EE keys yet) — images included
     const msg = {
-      text, i: imgs.length ? imgs : undefined,
+      text,
       senderId: ME.uid, senderName: MY.username || 'Unknown',
       senderAvatar: MY.avatar || 'dragon', senderPhoto: MY.photoURL || '',
       timestamp: Date.now(), reactions: null
     };
+    if (imgs.length) msg.i = imgs;
     if (replyTo) msg.replyTo = { msgId: replyTo.k, text: decrypted[replyTo.k]?.t || '', senderName: replyTo.s };
     await push(ref(rtdb, `messages/${CID}`), msg);
     try {

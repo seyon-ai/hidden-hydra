@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Help — Hidden Hydra</title>
   <meta name="theme-color" content="#05050A"/>
-  <link rel="icon" href="assets/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" href="assets/logo-32.png">
+  <link rel="icon" href="assets/favicon.ico?v=260915b" sizes="any">
+  <link rel="icon" type="image/png" href="assets/logo-32.png?v=260915b">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/global.css">
-  <link rel="stylesheet" href="css/pages.css">
+  <link rel="stylesheet" href="css/global.css?v=260915b">
+  <link rel="stylesheet" href="css/pages.css?v=260915b">
 </head>
 <body>
 <nav class="pnav" id="nav">
-  <a href="index.html" class="logo"><img src="assets/logo-64.png" alt="">HIDDEN HYDRA</a>
+  <a href="index.html" class="logo"><img src="assets/logo-64.png?v=260915b" alt="">HIDDEN HYDRA</a>
   <div class="nav-links">
     <a href="features.html">Features</a>
     <a href="security.html">Security</a>
@@ -64,6 +64,7 @@
       4) If health says true but calls fail: your key may be invalid or revoked — rotate it (the old Groq key was committed to your old public repo, so rotate it anyway).</div></details>
     <details><summary>I hid the left panel and can't bring it back.</summary><div>A gold slide-back handle sits at the middle of the left screen edge whenever the panel is away (desktop collapsed or mobile closed). Tap it — or the three-line icon in any chat header on mobile.</div></details>
     <details><summary>DMs are locked or say "plaintext".</summary><div>Both people must open the app once with the v2 build — that publishes each side's encryption key to their profile. Until the other side does, the DM gracefully falls back to plaintext (with a notice). Once they've been online, press <b>Retry key</b> on the locked notice and everything decrypts.</div></details>
+    <details><summary>After a deploy, some device still shows old bugs / old logo.</summary><div>Tabs that were already open keep the old code in memory until reloaded, and browsers cache images for days. On every device: <b>close the tab completely and open the site again</b> (or Ctrl/Cmd+Shift+R). Asset URLs carry a version tag now, so a fresh load always pulls the new logo and code.</div></details>
     <details><summary>I lost my phone / cleared browser data.</summary><div>Your encryption private key lives in that browser only. Old encrypted history from groups you can re-join will resync keys from members; DMs sent to your old key stay private to the old device — that's what end-to-end means.</div></details>
     <details><summary>Why anonymous auth?</summary><div>Zero friction and zero personal data. Your identity is the profile you choose, protected by Firestore rules keyed to your anonymous UID.</div></details>
   </div>
@@ -74,7 +75,7 @@
 </div>
 
 <footer class="pfoot">
-  <a href="index.html" class="logo"><img src="assets/logo-64.png" alt="">HIDDEN HYDRA</a>
+  <a href="index.html" class="logo"><img src="assets/logo-64.png?v=260915b" alt="">HIDDEN HYDRA</a>
   <div class="foot-links">
     <a href="features.html">Features</a><a href="security.html">Security</a><a href="about.html">About</a><a href="privacy.html">Privacy</a>
   </div>
