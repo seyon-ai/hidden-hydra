@@ -65,6 +65,7 @@ let msgAddedRef = null, msgChangedRef = null, typRef = null, keyUnsub = null;
 let dmUnsub = null, grpUnsub = null, selfUnsub = null, dmPresenceUnsub = null;
 
 let lastMsgDate = '', lastMsgSender = '', msgCount = 0;
+let lastDmUpgrade = 0;
 
 // ─── UTILS ────────────────────────────────────────────
 const $   = id => document.getElementById(id);
@@ -544,44 +545,76 @@ async function runSearch(val) {
 }
 window.clearSearch = function () { $('search-inp').value = ''; $('sc-clear').style.display = 'none'; switchTab('world', document.querySelector('[data-tab="world"]')); };
 
-// ─── E2EE ROOM KEY SETUP ──────────────────────────────
+// ─── E2EE ROOM KEY SETUP (wraps-map schema, multi-device safe) ───
+// keys/{uid} = { wraps: { "1": {epk,ct}, "2": {...} }, latest: n }
+// Merge-writes mean nobody ever destroys another epoch's wrap, and sharing
+// is per-epoch so devices converge on every epoch they are missing.
+
+async function readMyWraps(gid) {
+  // returns Map epoch -> rawB64 that THIS device can unwrap, plus doc snapshot
+  const kd = await getDoc(doc(db, 'groups', gid, 'keys', ME.uid));
+  const out = { exists: kd.exists(), epochs: {}, latest: 0 };
+  if (!kd.exists()) return out;
+  const d = kd.data();
+  const wraps = d.wraps || (d.epk ? { [d.epoch || 1]: { epk: d.epk, ct: d.ct } } : {});  // legacy shape
+  for (const [ep, rec] of Object.entries(wraps)) {
+    try { out.epochs[ep] = await unwrapKey(rec, ME.uid); out.latest = Math.max(out.latest, Number(ep)); }
+    catch (_) { /* wrapped for another keypair (browser reset) — skip */ }
+  }
+  return out;
+}
+
 async function setupRoomKey(gid, members) {
-  const keyRef = doc(db, 'groups', gid, 'keys', ME.uid);
-  let kd;
-  try { kd = await getDoc(keyRef); }
+  let mine;
+  try { mine = await readMyWraps(gid); }
   catch (e) {
-    // usually means firestore.rules wasn't updated (keys subcollection denied)
     console.warn('keys subcollection unreadable — Firestore rules not updated?', e);
     return { ok: false, rulesErr: true };
   }
-  if (kd.exists()) {
-    const raw = await unwrapKey(kd.data(), ME.uid);
-    const st = readRoomStore(gid);
-    st.epochs[kd.data().epoch || 1] = raw; st.current = kd.data().epoch || 1;
+
+  const st = readRoomStore(gid);
+  let unlockedAny = false;
+  for (const [ep, raw] of Object.entries(mine.epochs)) {
+    st.epochs[ep] = raw; unlockedAny = true;
+  }
+  // local store from a previous session also counts
+  if (!unlockedAny && st.epochs[st.current]) unlockedAny = true;
+  if (unlockedAny) {
+    if (mine.latest) st.current = mine.latest;
+    if (!st.current || !st.epochs[st.current]) st.current = Number(Object.keys(st.epochs).pop() || 1);
     writeRoomStore(gid, st);
+    // make sure our own doc carries wraps for epochs we hold (self-heal)
+    for (const ep of Object.keys(st.epochs)) await publishMyKey(gid, st.epochs[ep], Number(ep));
     return { ok: true, epoch: st.current };
   }
-  const st0 = readRoomStore(gid);
-  if (st0.epochs[st0.current]) {                       // we know the key from another session
-    await publishMyKey(gid, st0.epochs[st0.current], st0.current);
-    return { ok: true, epoch: st0.current };
-  }
-  const anyKeys = await getDocs(query(collection(db, 'groups', gid, 'keys'), limit(1)));
-  if (anyKeys.empty) {                                 // first person in the room → mint epoch 1
+
+  // we hold nothing: is the room empty of keys (first ever visitor) → mint epoch 1
+  let anyKeys;
+  try { anyKeys = await getDocs(query(collection(db, 'groups', gid, 'keys'), limit(1))); }
+  catch (e) { return { ok: false, rulesErr: true }; }
+  if (anyKeys.empty) {
     const raw = newRoomKeyRaw();
-    const st = readRoomStore(gid); st.epochs[1] = raw; st.current = 1; writeRoomStore(gid, st);
+    st.epochs[1] = raw; st.current = 1; writeRoomStore(gid, st);
     await publishMyKey(gid, raw, 1);
     updateDoc(doc(db, 'groups', gid), { e2eeEpoch: 1 }).catch(() => {});
     return { ok: true, epoch: 1 };
   }
-  // someone has keys but not us → wait for a key-holder to wrap one for us
-  return await waitForWrappedKey(gid, 12000);
+
+  // keys exist but none for us (or ours are for a lost keypair):
+  // wait for a key-holder's share, then give up with guidance
+  const res = await waitForWrappedKey(gid, 12000);
+  if (res.ok) {
+    for (const ep of Object.keys(st.epochs)) await publishMyKey(gid, st.epochs[ep], Number(ep)).catch(() => {});
+  }
+  return res;
 }
 
+/** merge-write our own wrap for an epoch (never destroys other epochs) */
 async function publishMyKey(gid, raw, epoch) {
   try {
     const wrapped = await wrapKeyFor(raw, MY.publicKey);
-    await setDoc(doc(db, 'groups', gid, 'keys', ME.uid), { ...wrapped, epoch, at: serverTimestamp() });
+    await setDoc(doc(db, 'groups', gid, 'keys', ME.uid),
+      { [`wraps.${epoch}`]: wrapped, latest: epoch }, { merge: true });
   } catch (_) {}
 }
 
@@ -589,34 +622,41 @@ function waitForWrappedKey(gid, ms) {
   return new Promise(resolve => {
     let done = false;
     const finish = val => { if (!done) { done = true; keyUnsub?.(); keyUnsub = null; resolve(val); } };
-    keyUnsub = onSnapshot(doc(db, 'groups', gid, 'keys', ME.uid), async snap => {
+    const tryDoc = async snap => {
       if (!snap.exists()) return;
-      try {
-        const raw = await unwrapKey(snap.data(), ME.uid);
-        const st = readRoomStore(gid);
-        st.epochs[snap.data().epoch || 1] = raw; st.current = snap.data().epoch || 1;
-        writeRoomStore(gid, st);
-        finish({ ok: true, epoch: st.current });
-      } catch (_) { finish({ ok: false }); }
-    });
+      const d = snap.data();
+      const wraps = d.wraps || (d.epk ? { [d.epoch || 1]: { epk: d.epk, ct: d.ct } } : {});
+      const st = readRoomStore(gid);
+      let got = false;
+      for (const [ep, rec] of Object.entries(wraps)) {
+        if (st.epochs[ep]) continue;
+        try { st.epochs[ep] = await unwrapKey(rec, ME.uid); st.current = Number(ep); got = true; } catch (_) {}
+      }
+      if (got) { writeRoomStore(gid, st); finish({ ok: true, epoch: st.current }); }
+    };
+    keyUnsub = onSnapshot(doc(db, 'groups', gid, 'keys', ME.uid), snap => { tryDoc(snap); });
     setTimeout(() => finish({ ok: false, pending: true }), ms);
   });
 }
 
-/** key-holders wrap the room key for members who don't have one yet */
+/** key-holders merge-write wraps for every epoch each member is missing */
 async function shareRoomKeys(gid, members) {
   const st = readRoomStore(gid);
-  const raw = st.epochs[st.current]; if (!raw) return;
+  const myEpochs = Object.keys(st.epochs).map(Number);
+  if (!myEpochs.length || !members?.length) return;
   try {
-    const have = await getDocs(collection(db, 'groups', gid, 'keys'));
-    const haveSet = new Set(have.docs.map(d => d.id));
-    const missing = (members || []).filter(uid => uid !== ME.uid && !haveSet.has(uid)).slice(0, 40);
-    await Promise.all(missing.map(async uid => {
+    await Promise.all(members.slice(0, 40).map(async uid => {
+      if (uid === ME.uid) return;
       try {
+        const kd = await getDoc(doc(db, 'groups', gid, 'keys', uid));
+        const have = new Set(Object.keys(kd.exists() ? (kd.data().wraps || {}) : {}));
+        const missing = myEpochs.filter(ep => !have.has(String(ep)));
+        if (!missing.length) return;
         const u = await getDoc(doc(db, 'users', uid));
         if (!u.exists() || !u.data().publicKey) return;
-        const wrapped = await wrapKeyFor(raw, u.data().publicKey);
-        await setDoc(doc(db, 'groups', gid, 'keys', uid), { ...wrapped, epoch: st.current, at: serverTimestamp() });
+        const patch = {};
+        for (const ep of missing) patch[`wraps.${ep}`] = await wrapKeyFor(st.epochs[ep], u.data().publicKey);
+        await setDoc(doc(db, 'groups', gid, 'keys', uid), patch, { merge: true });
       } catch (_) {}
     }));
   } catch (_) {}
@@ -682,18 +722,35 @@ window.openChat = async function (cid, type, data) {
   if (isAI) {
     ACTIVE = { mode: 'ai', epoch: 0 };
   } else if (type === 'dm') {
-    const other = await getDoc(doc(db, 'users', data.uid));
-    const pub = other.data()?.publicKey;
-    if (pub) {
-      ACTIVE = { mode: 'dm', key: await deriveDMKey(ME.uid, data.uid, pub), epoch: 0 };
-    } else {
-      ACTIVE = { mode: 'legacy', epoch: 0 };   // pre-E2EE profile → plaintext fallback
+    // resolve the peer uid robustly (profile payload or chat doc members)
+    let otherUid = data.uid;
+    if (!otherUid) {
+      try {
+        const cd = await getDoc(doc(db, 'chats', cid));
+        otherUid = cd.data()?.members?.find(m => m !== ME.uid);
+      } catch (_) {}
+    }
+    CDATA.otherUid = otherUid;
+    try {
+      const other = await getDoc(doc(db, 'users', otherUid));
+      const pub = other.data()?.publicKey;
+      if (pub) {
+        ACTIVE = { mode: 'dm', key: await deriveDMKey(ME.uid, otherUid, pub), epoch: 0 };
+      } else {
+        ACTIVE = { mode: 'legacy', epoch: 0 };   // peer never loaded v2 yet → plaintext for now
+        toast('This DM stays plaintext until the other person signs in once with the new build');
+      }
+    } catch (e) {
+      console.warn('DM key setup failed:', e);
+      ACTIVE = { mode: 'legacy', epoch: 0 };
+      toast('E2EE unavailable for this DM (' + e.message + ') — sending plaintext');
     }
   } else {
     // world rooms: join members list (capped) so keys can propagate
     if (data.type === 'global' && !(data.members || []).includes(ME.uid) && (data.members || []).length < 2000) {
       updateDoc(doc(db, 'groups', cid), { members: arrayUnion(ME.uid) }).catch(() => {});
       data.members = [...(data.members || []), ME.uid];
+      $('ch-sub').innerHTML = `${data.members.length} members · ${icon('lock', '', 10)} E2EE`;
     }
     let res;
     try { res = await setupRoomKey(cid, data.members || []); }
@@ -706,7 +763,7 @@ window.openChat = async function (cid, type, data) {
       $('keybar').dataset.gid = cid;
       $('keybar-txt').textContent = res.rulesErr
         ? 'Encryption keys unreachable — paste firestore.rules into the Firebase console (Rules tab), then press Retry.'
-        : "Syncing encryption keys — waiting for a member who holds this room's key.";
+        : "Syncing keys — a member who holds this room's key must open the room. If you reset this browser or switched devices, older messages stay locked; press New epoch to keep chatting.";
     }
   }
 
@@ -719,15 +776,28 @@ window.rekeyRetry = function () {
   if (gid && CDATA) openChat(gid, 'group', CDATA);
 };
 
-/** "Unlock" button on locked bubbles: re-fetch our wrapped room key and re-render */
+/** "Unlock" button on locked bubbles / notice: re-fetch keys and re-render */
 window.retryUnlock = async function () {
-  if (CTYPE !== 'group' || !CID) return;
-  toast('Fetching room key…');
-  let res;
-  try { res = await setupRoomKey(CID, CDATA?.members || []); }
-  catch (e) { res = { ok: false }; }
-  if (res.ok) {
-    ACTIVE = { mode: 'room', epoch: res.epoch, key: await currentRoomKey(CID) };
+  if (!CID) return;
+  toast('Fetching keys…');
+  let ok = false;
+  if (CTYPE === 'dm') {
+    try {
+      const ou = CDATA?.otherUid || CDATA?.uid;
+      const od = await getDoc(doc(db, 'users', ou));
+      const pub = od.data()?.publicKey;
+      if (pub) { ACTIVE = { mode: 'dm', key: await deriveDMKey(ME.uid, ou, pub), epoch: 0 }; ok = true; }
+    } catch (_) {}
+  } else if (CTYPE === 'group') {
+    let res;
+    try { res = await setupRoomKey(CID, CDATA?.members || []); } catch (_) { res = { ok: false }; }
+    if (res.ok) {
+      ACTIVE = { mode: 'room', epoch: res.epoch, key: await currentRoomKey(CID) };
+      ok = true;
+      shareRoomKeys(CID, CDATA?.members || []);
+    }
+  }
+  if (ok) {
     $('keybar').style.display = 'none';
     decrypted = {};
     $('msgs').innerHTML = '';
@@ -735,10 +805,9 @@ window.retryUnlock = async function () {
     detachMsgListeners();
     attachMsgListeners(CID);
     attachTypingListener(CID);
-    shareRoomKeys(CID, CDATA?.members || []);
     toast('Unlocked', 'ok');
   } else {
-    toast('Key still unavailable — a member must open the room, or start a new epoch', 'err');
+    toast('Keys still unavailable — the other side must open the app once with the new build', 'err');
   }
 };
 
@@ -832,12 +901,67 @@ async function appendMsg(msg) {
         payload = await decryptPayload(key, msg.ct);
         if (payload) decrypted[msg._key] = payload;
       }
+      // fallback: try every epoch this device holds (mis-tagged/older sends)
+      if (!payload && ACTIVE.mode === 'room') {
+        for (const ep of Object.keys(readRoomStore(CID).epochs)) {
+          if (Number(ep) === (msg.e || ACTIVE.epoch || 1)) continue;
+          const k2 = await roomKeyForEpoch(CID, Number(ep));
+          if (!k2) continue;
+          payload = await decryptPayload(k2, msg.ct);
+          if (payload) { decrypted[msg._key] = payload; break; }
+        }
+      }
+      // DM late-key upgrade: peer's publicKey may have landed after we opened the chat
+      if (!payload && CTYPE === 'dm' && ACTIVE.mode !== 'dm') {
+        const now = Date.now();
+        if (now - lastDmUpgrade > 4000) {
+          lastDmUpgrade = now;
+          try {
+            const ou = CDATA?.otherUid || CDATA?.uid;
+            if (ou) {
+              const od = await getDoc(doc(db, 'users', ou));
+              const pub2 = od.data()?.publicKey;
+              if (pub2) {
+                const k3 = await deriveDMKey(ME.uid, ou, pub2);
+                payload = await decryptPayload(k3, msg.ct);
+                if (payload) { decrypted[msg._key] = payload; ACTIVE = { mode: 'dm', key: k3, epoch: 0 }; }
+              }
+            }
+          } catch (_) {}
+        }
+      }
       if (!payload) locked = true;
     }
-    } else {
+  } else {
       payload = { t: msg.text || '', i: msg.i || undefined, plain: true };
       decrypted[msg._key] = payload;
     }
+
+  // locked messages collapse into a single honest notice instead of a wall of bubbles
+  if (locked) {
+    let note = wrap.querySelector('[data-locknote]');
+    if (!note) {
+      note = mk('div'); note.className = 'lock-note'; note.dataset.locknote = '1';
+      note.innerHTML =
+        icon('lock', '', 14) +
+        `<span class="ln-txt">0 encrypted messages locked</span>` +
+        `<span class="ln-why">This device doesn't hold their key — sent from another device/epoch, or before a browser reset. E2EE means no server can recover them.</span>` +
+        `<span class="ln-btns"></span>`;
+      const btns = note.querySelector('.ln-btns');
+      const b1 = mk('button'); b1.className = 'btn-ghost'; b1.style.cssText = 'padding:5px 12px;font-size:9px';
+      b1.innerHTML = icon('refresh', '', 11) + ' Retry key'; b1.onclick = () => retryUnlock();
+      const b2 = mk('button'); b2.className = 'btn-ghost'; b2.style.cssText = 'padding:5px 12px;font-size:9px';
+      b2.innerHTML = icon('key', '', 11) + ' New epoch'; b2.onclick = () => rekeyRoom(CID);
+      btns.appendChild(b1); btns.appendChild(b2);
+      wrap.appendChild(note);
+    }
+    const n = (Number(note.dataset.count || 0) + 1);
+    note.dataset.count = n;
+    note.querySelector('.ln-txt').textContent = `${n} encrypted message${n !== 1 ? 's' : ''} locked`;
+    const nearBottom2 = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 200;
+    if (nearBottom2) wrap.scrollTop = wrap.scrollHeight;
+    return;
+  }
 
   // reply quote (new encrypted format, plus legacy v1 plaintext quotes)
   const r = payload?.r || (msg.replyTo ? { k: msg.replyTo.msgId, s: msg.replyTo.senderName, legacy: msg.replyTo.text } : null);
@@ -1052,6 +1176,15 @@ window.sendMsg = async function () {
   // commands
   const isCmd = await parseCommand(ME.uid, MY.username, CID, text, plainPush);
   if (isCmd) { clear(); return; }
+
+  // last-minute DM upgrade: peer's keys may have landed since we opened the chat
+  if (CTYPE === 'dm' && ACTIVE.mode === 'legacy' && CDATA?.otherUid) {
+    try {
+      const od = await getDoc(doc(db, 'users', CDATA.otherUid));
+      const pub2 = od.data()?.publicKey;
+      if (pub2) ACTIVE = { mode: 'dm', key: await deriveDMKey(ME.uid, CDATA.otherUid, pub2), epoch: 0 };
+    } catch (_) {}
+  }
 
   // AI room — plaintext by design (the AI must read it)
   if (CTYPE === 'ai') {

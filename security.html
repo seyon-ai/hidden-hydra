@@ -48,8 +48,8 @@
 
   <div class="doc-card">
     <h2 id="d3">3 · Groups &amp; world rooms</h2>
-    <p>Rooms use a random <b>room key</b> per <b>epoch</b>. The room key is <i>wrapped</i> (encrypted) individually for every member with an ephemeral ECDH exchange and stored in <code>groups/{room}/keys/{member}</code>. Any member who holds the raw room key automatically wraps it for members who don't have it yet, so keys propagate while people are online. Messages carry their epoch, so history you already hold keys for stays readable after a re-key.</p>
-    <p class="note">Honest limitation: if <i>nobody</i> who holds a room key comes online while you join, your client waits, then offers a <b>new epoch</b> instead of silently showing plaintext. World rooms also track a capped member list (2,000) for key distribution.</p>
+    <p>Rooms use a random <b>room key</b> per <b>epoch</b>. Every member's document <code>groups/{room}/keys/{member}</code> holds a <b>map of wraps — one per epoch</b> — each wrapped with an ephemeral ECDH exchange. Writes are <i>merge-writes</i>, so no device can ever destroy another epoch's wrap, and sharing is per-epoch: whenever a key-holder opens the room, they add wraps for every epoch each member is missing. Devices therefore converge on all epochs the moment both sides have been online once. Messages carry their epoch, so history you hold keys for stays readable after a re-key.</p>
+    <p class="note">Honest limitations: if your browser storage is reset (or you switch devices), the private key that unwraps old epochs is gone — old messages then stay locked forever, by design; the chat shows one collapsed notice instead of a wall of locked bubbles, and a <b>new epoch</b> keeps the conversation flowing. If <i>nobody</i> who holds a room key comes online while you join, your client waits, then offers a new epoch. World rooms track a capped member list (2,000) for key distribution.</p>
   </div>
 
   <div class="doc-card">

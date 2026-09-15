@@ -175,6 +175,19 @@
 .bubble.locked { opacity:.85; font-size:12px; display:flex; align-items:center; gap:7px; color:var(--dim); }
 .unlock-btn { color:var(--gold); margin-left:4px; }
 .unlock-btn:hover { color:var(--gold2); transform:scale(1.15); }
+
+/* collapsed "N messages locked" notice */
+.lock-note {
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  margin:10px auto; max-width:560px; padding:10px 16px;
+  background:rgba(192,57,43,.06); border:1px dashed rgba(192,57,43,.35);
+  border-radius:10px; color:var(--dim); font-size:11.5px; line-height:1.6;
+  animation:msgIn .2s ease;
+}
+.lock-note svg.icon { color:rgba(192,57,43,.8); flex-shrink:0; }
+.lock-note .ln-txt { color:var(--text); font-family:'Cinzel',serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; }
+.lock-note .ln-why { flex:1 1 100%; }
+.lock-note .ln-btns { display:flex; gap:8px; }
 .msg-text a { color:var(--gold); text-decoration:underline; text-underline-offset:2px; }
 
 .msg-imgs { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }

@@ -19,9 +19,12 @@ service cloud.firestore {
     match /groups/{gid} {
       allow read, write: if request.auth != null;
       match /keys/{uid} {
+        // wraps-map: any signed-in member may merge-write wraps for others
+        // (that is how keys propagate); only the owner may delete.
         allow read:   if request.auth != null;
-        allow create: if request.auth != null;              // key-holders wrap keys for others
-        allow update, delete: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null;
+        allow update: if request.auth != null;
+        allow delete: if request.auth != null && request.auth.uid == uid;
       }
     }
 

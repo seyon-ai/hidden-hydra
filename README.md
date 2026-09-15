@@ -58,6 +58,9 @@ node dev-server.mjs      # → http://localhost:3000 (static + /api emulation)
 ### Firebase (one-time)
 - Paste `firestore.rules` into *Firestore → Rules*, and `database.rules.json`
   into *Realtime Database → Rules*.
+- **Upgrading from an earlier v2 deploy? Re-paste `firestore.rules`** — the
+  `groups/{gid}/keys/{uid}` collection now needs `update` permission for
+  merge-written key wraps (that is what makes multi-device key sync converge).
 - Keep **Anonymous auth** enabled. The Firebase web config in
   `js/firebase-config.js` is a *public identifier* (like a client-id) — that is
   normal and safe; access control is done by the rules above. For extra
@@ -139,6 +142,7 @@ PWA manifest (installable) · OG social card · themed 404 · dev server.
 | Health says `true` but calls fail | Key invalid/revoked → rotate. (Your old Groq key was in the public repo — rotate it regardless.) |
 | "Encryption keys unreachable" banner | Paste `firestore.rules` into Firebase → Firestore → Rules (the `groups/{gid}/keys/{uid}` block is required). |
 | Locked bubble ("key not available on this device") | Press its ⟳ button to refetch; or a member with the key opens the room; or Group info → New epoch. |
+| Wall of old locked messages | Expected after a browser reset / device change / re-key: the private key for those epochs is gone and E2EE means no recovery. They collapse into one notice with Retry / New epoch actions. |
 | Left panel won't come back | Gold slide-back handle at the left screen edge (also on mobile whenever the drawer is closed). |
 
 ---

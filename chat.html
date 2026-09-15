@@ -83,7 +83,7 @@
 
       <div id="keybar">
         <span style="display:flex;color:var(--gold)" id="keybar-ic"></span>
-        <span style="flex:1" id="keybar-txt">Syncing encryption keys — waiting for a member who holds this room's key.</span>
+        <span style="flex:1" id="keybar-txt">Syncing keys — a member who holds this room's key must open the room. If you reset this browser or switched devices, older messages stay locked; press New epoch to keep chatting.</span>
         <button class="btn-ghost" onclick="rekeyRetry()">Retry</button>
         <button class="btn-ghost" onclick="rekeyRoom(document.getElementById('keybar').dataset.gid)">New epoch</button>
       </div>
